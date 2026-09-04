@@ -15,12 +15,14 @@ import { Route as AskRouteImport } from './routes/ask'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
+import { Route as OrganizationsRouteImport } from './routes/organizations'
 import { Route as ProjectsRouteImport } from './routes/projects'
 import { Route as PromptsRouteImport } from './routes/prompts'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as WatchlistRouteImport } from './routes/watchlist'
 import { Route as MapsMapIdRouteImport } from './routes/maps.$mapId'
 import { Route as OpportunitiesOpportunityIdRouteImport } from './routes/opportunities.$opportunityId'
+import { Route as OrganizationsOrgIdRouteImport } from './routes/organizations.$orgId'
 import { Route as ProjectsProjectIdRouteImport } from './routes/projects.$projectId'
 
 const IndexRoute = IndexRouteImport.update({
@@ -51,6 +53,11 @@ const LoginRoute = LoginRouteImport.update({
 const OnboardingRoute = OnboardingRouteImport.update({
   id: '/onboarding',
   path: '/onboarding',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OrganizationsRoute = OrganizationsRouteImport.update({
+  id: '/organizations',
+  path: '/organizations',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProjectsRoute = ProjectsRouteImport.update({
@@ -84,6 +91,11 @@ const OpportunitiesOpportunityIdRoute =
     path: '/opportunities/$opportunityId',
     getParentRoute: () => rootRouteImport,
   } as any)
+const OrganizationsOrgIdRoute = OrganizationsOrgIdRouteImport.update({
+  id: '/$orgId',
+  path: '/$orgId',
+  getParentRoute: () => OrganizationsRoute,
+} as any)
 const ProjectsProjectIdRoute = ProjectsProjectIdRouteImport.update({
   id: '/$projectId',
   path: '/$projectId',
@@ -97,12 +109,14 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
+  '/organizations': typeof OrganizationsRouteWithChildren
   '/projects': typeof ProjectsRouteWithChildren
   '/prompts': typeof PromptsRoute
   '/signup': typeof SignupRoute
   '/watchlist': typeof WatchlistRoute
   '/maps/$mapId': typeof MapsMapIdRoute
   '/opportunities/$opportunityId': typeof OpportunitiesOpportunityIdRoute
+  '/organizations/$orgId': typeof OrganizationsOrgIdRoute
   '/projects/$projectId': typeof ProjectsProjectIdRoute
 }
 export interface FileRoutesByTo {
@@ -112,12 +126,14 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
+  '/organizations': typeof OrganizationsRouteWithChildren
   '/projects': typeof ProjectsRouteWithChildren
   '/prompts': typeof PromptsRoute
   '/signup': typeof SignupRoute
   '/watchlist': typeof WatchlistRoute
   '/maps/$mapId': typeof MapsMapIdRoute
   '/opportunities/$opportunityId': typeof OpportunitiesOpportunityIdRoute
+  '/organizations/$orgId': typeof OrganizationsOrgIdRoute
   '/projects/$projectId': typeof ProjectsProjectIdRoute
 }
 export interface FileRoutesById {
@@ -128,12 +144,14 @@ export interface FileRoutesById {
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
+  '/organizations': typeof OrganizationsRouteWithChildren
   '/projects': typeof ProjectsRouteWithChildren
   '/prompts': typeof PromptsRoute
   '/signup': typeof SignupRoute
   '/watchlist': typeof WatchlistRoute
   '/maps/$mapId': typeof MapsMapIdRoute
   '/opportunities/$opportunityId': typeof OpportunitiesOpportunityIdRoute
+  '/organizations/$orgId': typeof OrganizationsOrgIdRoute
   '/projects/$projectId': typeof ProjectsProjectIdRoute
 }
 export interface FileRouteTypes {
@@ -145,12 +163,14 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/login'
     | '/onboarding'
+    | '/organizations'
     | '/projects'
     | '/prompts'
     | '/signup'
     | '/watchlist'
     | '/maps/$mapId'
     | '/opportunities/$opportunityId'
+    | '/organizations/$orgId'
     | '/projects/$projectId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -160,12 +180,14 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/login'
     | '/onboarding'
+    | '/organizations'
     | '/projects'
     | '/prompts'
     | '/signup'
     | '/watchlist'
     | '/maps/$mapId'
     | '/opportunities/$opportunityId'
+    | '/organizations/$orgId'
     | '/projects/$projectId'
   id:
     | '__root__'
@@ -175,12 +197,14 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/login'
     | '/onboarding'
+    | '/organizations'
     | '/projects'
     | '/prompts'
     | '/signup'
     | '/watchlist'
     | '/maps/$mapId'
     | '/opportunities/$opportunityId'
+    | '/organizations/$orgId'
     | '/projects/$projectId'
   fileRoutesById: FileRoutesById
 }
@@ -191,6 +215,7 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRoute
   LoginRoute: typeof LoginRoute
   OnboardingRoute: typeof OnboardingRoute
+  OrganizationsRoute: typeof OrganizationsRouteWithChildren
   ProjectsRoute: typeof ProjectsRouteWithChildren
   PromptsRoute: typeof PromptsRoute
   SignupRoute: typeof SignupRoute
@@ -243,6 +268,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OnboardingRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/organizations': {
+      id: '/organizations'
+      path: '/organizations'
+      fullPath: '/organizations'
+      preLoaderRoute: typeof OrganizationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/projects': {
       id: '/projects'
       path: '/projects'
@@ -285,6 +317,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OpportunitiesOpportunityIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/organizations/$orgId': {
+      id: '/organizations/$orgId'
+      path: '/$orgId'
+      fullPath: '/organizations/$orgId'
+      preLoaderRoute: typeof OrganizationsOrgIdRouteImport
+      parentRoute: typeof OrganizationsRoute
+    }
     '/projects/$projectId': {
       id: '/projects/$projectId'
       path: '/$projectId'
@@ -294,6 +333,18 @@ declare module '@tanstack/react-router' {
     }
   }
 }
+
+interface OrganizationsRouteChildren {
+  OrganizationsOrgIdRoute: typeof OrganizationsOrgIdRoute
+}
+
+const OrganizationsRouteChildren: OrganizationsRouteChildren = {
+  OrganizationsOrgIdRoute: OrganizationsOrgIdRoute,
+}
+
+const OrganizationsRouteWithChildren = OrganizationsRoute._addFileChildren(
+  OrganizationsRouteChildren,
+)
 
 interface ProjectsRouteChildren {
   ProjectsProjectIdRoute: typeof ProjectsProjectIdRoute
@@ -314,6 +365,7 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRoute: DashboardRoute,
   LoginRoute: LoginRoute,
   OnboardingRoute: OnboardingRoute,
+  OrganizationsRoute: OrganizationsRouteWithChildren,
   ProjectsRoute: ProjectsRouteWithChildren,
   PromptsRoute: PromptsRoute,
   SignupRoute: SignupRoute,

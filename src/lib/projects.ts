@@ -9,6 +9,12 @@ export async function listProjects(): Promise<Project[]> {
   return data ?? [];
 }
 
+export async function listOrgProjects(organizationId: string): Promise<Project[]> {
+  const { data, error } = await supabase.from("projects").select("*").eq("organization_id", organizationId).order("updated_at", { ascending: false });
+  if (error) throw error;
+  return data ?? [];
+}
+
 export async function getProject(id: string): Promise<Project | null> {
   const { data, error } = await supabase.from("projects").select("*").eq("id", id).maybeSingle();
   if (error) throw error;
@@ -22,6 +28,7 @@ export async function createProject(input: {
   industry?: string;
   objective?: string;
   timeHorizon?: string;
+  organizationId?: string;
 }): Promise<Project> {
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) throw new Error("Not signed in");
@@ -29,6 +36,7 @@ export async function createProject(input: {
     .from("projects")
     .insert({
       user_id: auth.user.id,
+      organization_id: input.organizationId ?? null,
       title: input.title,
       location_country: input.locationCountry ?? "",
       location_region: input.locationRegion ?? "",

@@ -40,6 +40,7 @@ export interface Database {
         Row: {
           id: string;
           user_id: string;
+          organization_id: string | null;
           title: string;
           location_country: string;
           location_region: string;
@@ -462,9 +463,53 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["watchlist_items"]["Row"]>;
         Relationships: [];
       };
+      organizations: {
+        Row: {
+          id: string;
+          name: string;
+          org_type:
+            | "company" | "university" | "government" | "investment_firm"
+            | "ngo" | "research_institute" | "consultancy" | "community_organization";
+          created_by: string;
+          created_at: string;
+        };
+        Insert: Partial<Omit<Database["public"]["Tables"]["organizations"]["Row"], "id" | "created_at">> & { name: string; created_by: string };
+        Update: Partial<Database["public"]["Tables"]["organizations"]["Row"]>;
+        Relationships: [];
+      };
+      organization_members: {
+        Row: {
+          id: string;
+          org_id: string;
+          user_id: string;
+          role: "owner" | "admin" | "strategist" | "researcher" | "analyst" | "member" | "viewer";
+          created_at: string;
+        };
+        Insert: Partial<Omit<Database["public"]["Tables"]["organization_members"]["Row"], "id" | "created_at">> & { org_id: string; user_id: string };
+        Update: Partial<Database["public"]["Tables"]["organization_members"]["Row"]>;
+        Relationships: [];
+      };
+      organization_invites: {
+        Row: {
+          id: string;
+          org_id: string;
+          email: string;
+          role: "admin" | "strategist" | "researcher" | "analyst" | "member" | "viewer";
+          invited_by: string;
+          created_at: string;
+        };
+        Insert: Partial<Omit<Database["public"]["Tables"]["organization_invites"]["Row"], "id" | "created_at">> & { org_id: string; email: string; invited_by: string };
+        Update: Partial<Database["public"]["Tables"]["organization_invites"]["Row"]>;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      accept_organization_invite: {
+        Args: { p_invite_id: string };
+        Returns: string;
+      };
+    };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };

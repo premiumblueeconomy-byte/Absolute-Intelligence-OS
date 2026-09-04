@@ -8,20 +8,26 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { listProjects, createProject, type Project } from "@/lib/projects";
+import { listMyOrganizations, type Organization } from "@/lib/organizations";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { Plus, ArrowRight } from "lucide-react";
 
 export default function Projects() {
   const { ready } = useRequireAuth();
   const [projects, setProjects] = useState<Project[]>([]);
+  const [orgs, setOrgs] = useState<Organization[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState("");
   const [country, setCountry] = useState("");
   const [industry, setIndustry] = useState("");
   const [objective, setObjective] = useState("");
+  const [organizationId, setOrganizationId] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const load = () => { void listProjects().then(setProjects); };
+  const load = () => {
+    void listProjects().then(setProjects);
+    void listMyOrganizations().then(setOrgs);
+  };
   useEffect(() => { if (ready) load(); }, [ready]);
 
   const submit = async (e: React.FormEvent) => {
@@ -29,8 +35,8 @@ export default function Projects() {
     if (!title.trim()) return;
     setSaving(true);
     try {
-      await createProject({ title, locationCountry: country, industry, objective });
-      setTitle(""); setCountry(""); setIndustry(""); setObjective("");
+      await createProject({ title, locationCountry: country, industry, objective, organizationId: organizationId || undefined });
+      setTitle(""); setCountry(""); setIndustry(""); setObjective(""); setOrganizationId("");
       setShowForm(false);
       load();
     } catch (err) {
@@ -72,6 +78,20 @@ export default function Projects() {
                 <Label htmlFor="objective">Objective</Label>
                 <Textarea id="objective" value={objective} onChange={(e) => setObjective(e.target.value)} placeholder="What are you trying to unlock?" />
               </div>
+              {orgs.length > 0 && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="org">Share with organization</Label>
+                  <select
+                    id="org"
+                    value={organizationId}
+                    onChange={(e) => setOrganizationId(e.target.value)}
+                    className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  >
+                    <option value="">Just me</option>
+                    {orgs.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+                  </select>
+                </div>
+              )}
               <Button type="submit" disabled={saving}>{saving ? "Creating…" : "Create project"}</Button>
             </form>
           </Card>

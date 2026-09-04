@@ -58,10 +58,24 @@ Phase 2 is too:
 - **AIQ** — a 20-question self-assessment across the spec's 10 intelligence domains, with the
   0-100 classification bands (Reactive → Theoretical Absolute Intelligence), strengths/weaknesses,
   targeted exercises, and historical progress across retakes
+- **Decision Log** — institutional memory per project (decision, context, options considered,
+  expected vs. actual outcome, learning)
+- **Watchlist** — track markets/companies/technologies/etc.; "Check" is explicitly labeled as not
+  a live data feed — it calls the same reasoning engine as everything else and reports an honest
+  confidence score instead of a fabricated current status
+- **AI-assisted System Map generation** — "Generate with AI" proposes a system map's nodes and
+  relationships from a project's objective
+- **Organizations & Collaboration** — organizations, role-based membership (owner/admin/
+  strategist/researcher/analyst/member/viewer), email-based invites (accepted via an RPC that
+  checks the invite email against the caller's own auth JWT — never a client-trusted claim).
+  Projects can optionally belong to an organization; every project-scoped table's SELECT policy
+  was extended so org members can see a shared project and everything inside it. Writes stay
+  owner-only in this pass (multi-writer conflict handling is separate, later work), and uploaded
+  research-document *files* stay owner-only (only the row/metadata is shared) since the storage
+  bucket policy keys off the uploader's own folder path.
 
-**Not yet built** (Phase 2 remainder + Phase 3/4 per the spec's own priority order):
-AI-assisted System Map generation, Organizations/Collaboration, Global Opportunity Atlas,
-Intelligence Graph, vector search, i18n, admin panel, billing.
+**Not yet built** (Phase 3/4 per the spec's own priority order): Global Opportunity Atlas,
+Intelligence Graph, vector search, i18n, admin panel, billing/subscriptions.
 
 ## Stack
 
