@@ -17,9 +17,10 @@ import { runProblemExplorer } from "@/lib/problems";
 import { readinessLabel } from "@/lib/scoring";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { listMaps, createMap, type SystemMap } from "@/lib/system-maps";
+import { embedProjectOpportunities } from "@/lib/semantic-search";
 import { ResearchTab } from "@/components/project/ResearchTab";
 import { DecisionsTab } from "@/components/project/DecisionsTab";
-import { ArrowRight, Sprout, AlertTriangle, GitBranch, Plus } from "lucide-react";
+import { ArrowRight, Sprout, AlertTriangle, GitBranch, Plus, Sparkles, Loader2 } from "lucide-react";
 
 export default function ProjectWorkspace() {
   const { ready } = useRequireAuth();
@@ -74,7 +75,7 @@ export default function ProjectWorkspace() {
           </TabsContent>
 
           <TabsContent value="opportunities">
-            <OpportunitiesTab opportunities={opportunities} />
+            <OpportunitiesTab projectId={projectId} opportunities={opportunities} onReload={reload} />
           </TabsContent>
 
           <TabsContent value="systems">
@@ -186,11 +187,34 @@ function DiscoverTab({ projectId, onDiscovered }: { projectId: string; onDiscove
   );
 }
 
-function OpportunitiesTab({ opportunities }: { opportunities: Opportunity[] }) {
+function OpportunitiesTab({ projectId, opportunities, onReload }: { projectId: string; opportunities: Opportunity[]; onReload: () => void }) {
+  const [embedding, setEmbedding] = useState(false);
+  const notEmbedded = opportunities.filter((o) => !o.embedded_at).length;
+
+  const embedAll = async () => {
+    setEmbedding(true);
+    try {
+      const count = await embedProjectOpportunities(projectId);
+      toast.success(count > 0 ? `Embedded ${count} opportunit${count === 1 ? "y" : "ies"} for semantic search` : "Nothing to embed");
+      onReload();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not embed opportunities — is EMBEDDING_API_KEY set on the Supabase project?");
+    } finally {
+      setEmbedding(false);
+    }
+  };
+
   if (opportunities.length === 0) {
     return <p className="text-sm text-muted-foreground">No opportunities saved yet. Discover your first one.</p>;
   }
   return (
+    <div className="space-y-3">
+      {notEmbedded > 0 && (
+        <Button size="sm" variant="outline" onClick={embedAll} disabled={embedding}>
+          {embedding ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+          Enable semantic search ({notEmbedded} not yet embedded)
+        </Button>
+      )}
     <ul className="space-y-2">
       {opportunities.map((o) => {
         const readiness = readinessLabel(o.opportunity_score);
@@ -212,6 +236,7 @@ function OpportunitiesTab({ opportunities }: { opportunities: Opportunity[] }) {
         );
       })}
     </ul>
+    </div>
   );
 }
 

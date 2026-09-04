@@ -4,6 +4,7 @@ import { AppNav } from "@/components/AppNav";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTranslation } from "@/lib/i18n";
 import {
   Sprout, AlertTriangle, Cpu, TrendingUp, Building2, FlaskConical, Lightbulb,
   ArrowRight, ScanSearch, GitBranch, Sparkles, TestTube2, Rocket,
@@ -31,6 +32,7 @@ const HOW_IT_WORKS = [
 export default function Landing() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   useEffect(() => {
     if (!loading && user) void navigate({ to: "/dashboard" });
@@ -45,25 +47,24 @@ export default function Landing() {
             ABSOLUTE <span className="text-accent">INTELLIGENCE</span>
           </h1>
           <p className="mt-3 text-sm md:text-base font-mono uppercase tracking-widest text-muted-foreground">
-            Discover Reality. Connect Knowledge. Unlock Opportunity. Execute Better.
+            {t("landing.tagline")}
           </p>
           <p className="mt-6 text-base md:text-lg text-muted-foreground max-w-2xl mx-auto">
-            Absolute Intelligence OS connects evidence, science, markets, technology, systems thinking and
-            strategy to reveal what others cannot see.
+            {t("landing.subtitle")}
           </p>
           <div className="mt-8 flex items-center justify-center gap-3">
             <Button size="lg" variant="accent" asChild>
-              <Link to="/signup">Unlock an Opportunity <ArrowRight className="w-4 h-4" /></Link>
+              <Link to="/signup">{t("landing.ctaPrimary")} <ArrowRight className="w-4 h-4" /></Link>
             </Button>
             <Button size="lg" variant="outline" asChild>
-              <a href="#how-it-works">Explore How It Works</a>
+              <a href="#how-it-works">{t("landing.ctaSecondary")}</a>
             </Button>
           </div>
         </section>
 
         <section className="max-w-5xl mx-auto px-4 md:px-6 pb-16">
           <h2 className="text-xs font-mono uppercase tracking-wider text-muted-foreground text-center mb-6">
-            What can you unlock?
+            {t("landing.whatCanYouUnlock")}
           </h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {UNLOCK_CARDS.map(({ icon: Icon, label }) => (
@@ -77,7 +78,7 @@ export default function Landing() {
 
         <section id="how-it-works" className="max-w-5xl mx-auto px-4 md:px-6 pb-20">
           <h2 className="text-xs font-mono uppercase tracking-wider text-muted-foreground text-center mb-6">
-            How it works
+            {t("landing.howItWorks")}
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {HOW_IT_WORKS.map(({ icon: Icon, title, body }, i) => (
@@ -97,9 +98,9 @@ export default function Landing() {
 
         <section className="max-w-3xl mx-auto px-4 md:px-6 pb-24 text-center">
           <p className="text-xl md:text-2xl font-bold text-foreground">
-            Don't stop at answers.
+            {t("landing.closingLine1")}
             <br />
-            Discover what becomes possible.
+            {t("landing.closingLine2")}
           </p>
         </section>
       </main>

@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
+import { toast } from "sonner";
 import { AppNav } from "@/components/AppNav";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { listAtlasOpportunities, groupByCountry, type AtlasOpportunity } from "@/lib/atlas";
-import { Globe2, ArrowUpDown, Search } from "lucide-react";
+import { semanticSearchOpportunities, type SemanticMatch } from "@/lib/semantic-search";
+import { Globe2, ArrowUpDown, Search, Sparkles, Loader2 } from "lucide-react";
 
 type SortKey = "opportunity_score" | "confidence_score" | "updated_at";
 
@@ -20,6 +23,25 @@ export default function Atlas() {
   const [status, setStatus] = useState("");
   const [minScore, setMinScore] = useState(0);
   const [sortKey, setSortKey] = useState<SortKey>("opportunity_score");
+
+  const [semanticQuery, setSemanticQuery] = useState("");
+  const [semanticResults, setSemanticResults] = useState<SemanticMatch[] | null>(null);
+  const [semanticLoading, setSemanticLoading] = useState(false);
+
+  const runSemanticSearch = async () => {
+    if (!semanticQuery.trim()) return;
+    setSemanticLoading(true);
+    try {
+      const results = await semanticSearchOpportunities(semanticQuery.trim());
+      setSemanticResults(results);
+      if (results.length === 0) toast.info("No embedded opportunities matched — opportunities need to be embedded before they're searchable this way.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Semantic search failed");
+      setSemanticResults(null);
+    } finally {
+      setSemanticLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!ready) return;
@@ -67,6 +89,43 @@ export default function Atlas() {
           with you through an organization — in one place. Grouping and filtering happen entirely
           client-side over data you already have; nothing here is a live external feed.
         </p>
+
+        <Card className="p-4 mb-6">
+          <div className="flex items-center gap-1.5 text-xs font-mono uppercase tracking-wider text-muted-foreground mb-2">
+            <Sparkles className="w-3.5 h-3.5" /> Semantic search (meaning, not keywords)
+          </div>
+          <p className="text-[11px] text-muted-foreground mb-2">
+            Searches by meaning across opportunities that have been embedded, using a separate
+            embeddings provider — not Anthropic's API, which doesn't serve embeddings. Requires
+            the site operator to have set an <code>EMBEDDING_API_KEY</code> secret; if that's not
+            configured, or an opportunity hasn't been embedded yet, this will say so rather than
+            fabricating a result.
+          </p>
+          <div className="flex gap-2">
+            <Input
+              value={semanticQuery}
+              onChange={(e) => setSemanticQuery(e.target.value)}
+              placeholder="e.g. low-cost water purification for rural communities"
+              className="flex-1"
+              onKeyDown={(e) => e.key === "Enter" && void runSemanticSearch()}
+            />
+            <Button onClick={runSemanticSearch} disabled={semanticLoading}>
+              {semanticLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />} Search
+            </Button>
+          </div>
+          {semanticResults && semanticResults.length > 0 && (
+            <ul className="mt-3 space-y-1.5">
+              {semanticResults.map((r) => (
+                <li key={r.id}>
+                  <Link to="/opportunities/$opportunityId" params={{ opportunityId: r.id }} className="flex items-center justify-between text-xs hover:text-accent">
+                    <span className="font-semibold">{r.title}</span>
+                    <span className="text-muted-foreground">{(r.similarity * 100).toFixed(0)}% match</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
           <Card className="p-3">

@@ -84,9 +84,35 @@ Phase 2 is too:
   not AI-generated and not semantic/vector similarity (see "Not yet built" below) — every edge
   traces to a real field match, and the UI says so.
 
-**Not yet built** (Phase 3/4 per the spec's own priority order): vector/semantic search (would
-need an embeddings provider — Anthropic's API doesn't serve embeddings, so this needs a new
-API key and a schema change, not just code), i18n, admin panel, billing/subscriptions.
+- **Admin panel** (`/admin`) — restricted to accounts with `profiles.is_platform_admin = true`
+  (there's no self-serve way to become one; set it directly in the database). Shows
+  platform-wide aggregate counts and a low-sensitivity organizations/recent-projects list —
+  deliberately never another user's actual project content, opportunities, or contact details.
+- **i18n** — a lightweight custom language context (no new dependency), with English, French,
+  Spanish, Portuguese and Swahili dictionaries. **Coverage is partial and honestly scoped**: only
+  the navigation bar and the landing page hero are translated; everything else in the app is
+  English-only. The translations are this model's own best-effort rendering, not reviewed by a
+  native speaker or professional localizer — treat them as a starting point to verify, especially
+  the Swahili strings.
+- **Vector/semantic search** — schema (`opportunities.embedding`, a `match_opportunities` RPC)
+  and two edge functions (`embed-text`, used both to embed an opportunity and to embed a search
+  query) are built and wired into the UI (an "Enable semantic search" action per project, a
+  semantic search box on the Atlas page). **Not live**: Anthropic's API doesn't serve embeddings,
+  so `embed-text` calls OpenAI's `text-embedding-3-small` by default and requires an
+  `EMBEDDING_API_KEY` Supabase secret that isn't set yet. Until it is, every embed/search call
+  fails loudly with a clear error — nothing here fabricates a result.
+- **Billing/subscriptions** — schema (`subscriptions`, one free row auto-created per signup) and
+  three edge functions (`stripe-checkout`, `stripe-portal`, `stripe-webhook`) are built, plus a
+  `/billing` page with plan cards and an upgrade flow. **Not live**: needs a real Stripe account
+  — `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PRO`, `STRIPE_PRICE_ENTERPRISE`
+  secrets, Products/Prices created in the Stripe dashboard, and the webhook registered there
+  pointing at `stripe-webhook`'s URL (which needs `verify_jwt = false` — already set in
+  `supabase/config.toml` — since Stripe can't send a Supabase JWT). Until that's done, every
+  account just stays on the free plan and upgrade attempts fail with a clear error.
+
+**Not yet built**: Global Opportunity Atlas and Intelligence Graph are both built (see above) —
+nothing from the spec's Phase 3/4 priority list remains un-started, but semantic search and
+billing are scaffolded rather than live (see their entries above for exactly what's missing).
 
 ## Stack
 
@@ -114,11 +140,26 @@ so a future version can fan this out into one call per agent without changing th
    ```
    supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
    ```
-5. **Deploy the edge function**:
+5. **Deploy the edge functions**:
    ```
-   supabase functions deploy ask-absolute
+   supabase functions deploy ask-absolute research-extract systemmap-generate
    ```
 6. `npm install && npm run dev`
+
+The app is fully usable at this point. Two features are optional and need their own setup —
+skip them and everything else still works:
+
+- **Semantic search**: `supabase secrets set EMBEDDING_API_KEY=sk-...` (an OpenAI key by
+  default; `EMBEDDING_MODEL` to override the model), then
+  `supabase functions deploy embed-text`.
+- **Billing**: create Products/Prices for Pro and Enterprise in your Stripe dashboard, then
+  ```
+  supabase secrets set STRIPE_SECRET_KEY=sk_... STRIPE_PRICE_PRO=price_... STRIPE_PRICE_ENTERPRISE=price_... SITE_URL=https://your-domain
+  supabase functions deploy stripe-checkout stripe-portal stripe-webhook
+  ```
+  then register `https://<project-ref>.supabase.co/functions/v1/stripe-webhook` as a webhook
+  endpoint in the Stripe dashboard and `supabase secrets set STRIPE_WEBHOOK_SECRET=whsec_...`
+  with the signing secret Stripe gives you for it.
 
 ## Verifying against the MVP acceptance criteria
 

@@ -29,6 +29,7 @@ export interface Database {
           organization: string;
           objectives: string[];
           onboarded: boolean;
+          is_platform_admin: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -146,11 +147,19 @@ export interface Database {
           opex: Json;
           recommended_next_action: string;
           status: OpportunityStatus;
+          // Raw pgvector text representation ("[0.01,-0.02,...]"). Only ever
+          // written via update({ embedding: <array> }) from embedText(); never
+          // parsed client-side — similarity search happens server-side in
+          // match_opportunities().
+          embedding: string | null;
+          embedded_at: string | null;
           created_at: string;
           updated_at: string;
         };
         Insert: Partial<Omit<Database["public"]["Tables"]["opportunities"]["Row"], "id" | "created_at" | "updated_at">> & { project_id: string; user_id: string; title: string };
-        Update: Partial<Database["public"]["Tables"]["opportunities"]["Row"]>;
+        // embedding accepts a plain number[] on write (PostgREST casts a JSON
+        // array into the vector column) even though it reads back as text.
+        Update: Partial<Omit<Database["public"]["Tables"]["opportunities"]["Row"], "embedding">> & { embedding?: number[] | string | null };
         Relationships: [];
       };
       opportunity_scores: {
@@ -502,12 +511,58 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["organization_invites"]["Row"]>;
         Relationships: [];
       };
+      subscriptions: {
+        Row: {
+          id: string;
+          user_id: string;
+          plan: "free" | "pro" | "enterprise";
+          status: "active" | "trialing" | "past_due" | "canceled";
+          stripe_customer_id: string | null;
+          stripe_subscription_id: string | null;
+          current_period_end: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        // No client Insert/Update: rows are written only by the
+        // handle_new_user trigger and the stripe-webhook edge function
+        // (service role) — see the billing migration's RLS comment.
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {
       accept_organization_invite: {
         Args: { p_invite_id: string };
         Returns: string;
+      };
+      is_platform_admin: {
+        Args: Record<string, never>;
+        Returns: boolean;
+      };
+      admin_platform_stats: {
+        Args: Record<string, never>;
+        Returns: {
+          total_users: number;
+          total_organizations: number;
+          total_projects: number;
+          total_opportunities: number;
+          total_resources: number;
+          total_problems: number;
+        }[];
+      };
+      admin_list_organizations: {
+        Args: Record<string, never>;
+        Returns: { id: string; name: string; org_type: string; created_at: string; member_count: number }[];
+      };
+      admin_recent_projects: {
+        Args: { p_limit?: number };
+        Returns: { id: string; title: string; location_country: string; industry: string; status: string; created_at: string }[];
+      };
+      match_opportunities: {
+        Args: { p_query_embedding: number[]; p_match_count?: number };
+        Returns: { id: string; title: string; summary: string; project_id: string; similarity: number }[];
       };
     };
     Enums: Record<string, never>;

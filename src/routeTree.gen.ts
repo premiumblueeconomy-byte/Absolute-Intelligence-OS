@@ -10,9 +10,11 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AiqRouteImport } from './routes/aiq'
 import { Route as AskRouteImport } from './routes/ask'
 import { Route as AtlasRouteImport } from './routes/atlas'
+import { Route as BillingRouteImport } from './routes/billing'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as GraphRouteImport } from './routes/graph'
 import { Route as LoginRouteImport } from './routes/login'
@@ -32,6 +34,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AiqRoute = AiqRouteImport.update({
   id: '/aiq',
   path: '/aiq',
@@ -45,6 +52,11 @@ const AskRoute = AskRouteImport.update({
 const AtlasRoute = AtlasRouteImport.update({
   id: '/atlas',
   path: '/atlas',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BillingRoute = BillingRouteImport.update({
+  id: '/billing',
+  path: '/billing',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -116,9 +128,11 @@ const ProjectsProjectIdRoute = ProjectsProjectIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/aiq': typeof AiqRoute
   '/ask': typeof AskRoute
   '/atlas': typeof AtlasRoute
+  '/billing': typeof BillingRoute
   '/dashboard': typeof DashboardRoute
   '/graph': typeof GraphRoute
   '/login': typeof LoginRoute
@@ -135,9 +149,11 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/aiq': typeof AiqRoute
   '/ask': typeof AskRoute
   '/atlas': typeof AtlasRoute
+  '/billing': typeof BillingRoute
   '/dashboard': typeof DashboardRoute
   '/graph': typeof GraphRoute
   '/login': typeof LoginRoute
@@ -155,9 +171,11 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/aiq': typeof AiqRoute
   '/ask': typeof AskRoute
   '/atlas': typeof AtlasRoute
+  '/billing': typeof BillingRoute
   '/dashboard': typeof DashboardRoute
   '/graph': typeof GraphRoute
   '/login': typeof LoginRoute
@@ -176,9 +194,11 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
     | '/aiq'
     | '/ask'
     | '/atlas'
+    | '/billing'
     | '/dashboard'
     | '/graph'
     | '/login'
@@ -195,9 +215,11 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/admin'
     | '/aiq'
     | '/ask'
     | '/atlas'
+    | '/billing'
     | '/dashboard'
     | '/graph'
     | '/login'
@@ -214,9 +236,11 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/admin'
     | '/aiq'
     | '/ask'
     | '/atlas'
+    | '/billing'
     | '/dashboard'
     | '/graph'
     | '/login'
@@ -234,9 +258,11 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRoute
   AiqRoute: typeof AiqRoute
   AskRoute: typeof AskRoute
   AtlasRoute: typeof AtlasRoute
+  BillingRoute: typeof BillingRoute
   DashboardRoute: typeof DashboardRoute
   GraphRoute: typeof GraphRoute
   LoginRoute: typeof LoginRoute
@@ -259,6 +285,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/aiq': {
       id: '/aiq'
       path: '/aiq'
@@ -278,6 +311,13 @@ declare module '@tanstack/react-router' {
       path: '/atlas'
       fullPath: '/atlas'
       preLoaderRoute: typeof AtlasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/billing': {
+      id: '/billing'
+      path: '/billing'
+      fullPath: '/billing'
+      preLoaderRoute: typeof BillingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -400,9 +440,11 @@ const ProjectsRouteWithChildren = ProjectsRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRoute,
   AiqRoute: AiqRoute,
   AskRoute: AskRoute,
   AtlasRoute: AtlasRoute,
+  BillingRoute: BillingRoute,
   DashboardRoute: DashboardRoute,
   GraphRoute: GraphRoute,
   LoginRoute: LoginRoute,

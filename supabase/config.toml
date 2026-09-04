@@ -1,0 +1,7 @@
+# Per-function settings. Every function defaults to verify_jwt = true
+# (Supabase checks a caller's Supabase JWT before invoking it) except
+# stripe-webhook, which Stripe calls directly and so can never carry one —
+# that function verifies the request itself via the Stripe signature header
+# instead (see supabase/functions/stripe-webhook/index.ts).
+[functions.stripe-webhook]
+verify_jwt = false
