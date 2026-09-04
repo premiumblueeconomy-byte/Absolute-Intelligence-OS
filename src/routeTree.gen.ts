@@ -18,6 +18,7 @@ import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as ProjectsRouteImport } from './routes/projects'
 import { Route as PromptsRouteImport } from './routes/prompts'
 import { Route as SignupRouteImport } from './routes/signup'
+import { Route as WatchlistRouteImport } from './routes/watchlist'
 import { Route as MapsMapIdRouteImport } from './routes/maps.$mapId'
 import { Route as OpportunitiesOpportunityIdRouteImport } from './routes/opportunities.$opportunityId'
 import { Route as ProjectsProjectIdRouteImport } from './routes/projects.$projectId'
@@ -67,6 +68,11 @@ const SignupRoute = SignupRouteImport.update({
   path: '/signup',
   getParentRoute: () => rootRouteImport,
 } as any)
+const WatchlistRoute = WatchlistRouteImport.update({
+  id: '/watchlist',
+  path: '/watchlist',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MapsMapIdRoute = MapsMapIdRouteImport.update({
   id: '/maps/$mapId',
   path: '/maps/$mapId',
@@ -94,6 +100,7 @@ export interface FileRoutesByFullPath {
   '/projects': typeof ProjectsRouteWithChildren
   '/prompts': typeof PromptsRoute
   '/signup': typeof SignupRoute
+  '/watchlist': typeof WatchlistRoute
   '/maps/$mapId': typeof MapsMapIdRoute
   '/opportunities/$opportunityId': typeof OpportunitiesOpportunityIdRoute
   '/projects/$projectId': typeof ProjectsProjectIdRoute
@@ -108,6 +115,7 @@ export interface FileRoutesByTo {
   '/projects': typeof ProjectsRouteWithChildren
   '/prompts': typeof PromptsRoute
   '/signup': typeof SignupRoute
+  '/watchlist': typeof WatchlistRoute
   '/maps/$mapId': typeof MapsMapIdRoute
   '/opportunities/$opportunityId': typeof OpportunitiesOpportunityIdRoute
   '/projects/$projectId': typeof ProjectsProjectIdRoute
@@ -123,6 +131,7 @@ export interface FileRoutesById {
   '/projects': typeof ProjectsRouteWithChildren
   '/prompts': typeof PromptsRoute
   '/signup': typeof SignupRoute
+  '/watchlist': typeof WatchlistRoute
   '/maps/$mapId': typeof MapsMapIdRoute
   '/opportunities/$opportunityId': typeof OpportunitiesOpportunityIdRoute
   '/projects/$projectId': typeof ProjectsProjectIdRoute
@@ -139,6 +148,7 @@ export interface FileRouteTypes {
     | '/projects'
     | '/prompts'
     | '/signup'
+    | '/watchlist'
     | '/maps/$mapId'
     | '/opportunities/$opportunityId'
     | '/projects/$projectId'
@@ -153,6 +163,7 @@ export interface FileRouteTypes {
     | '/projects'
     | '/prompts'
     | '/signup'
+    | '/watchlist'
     | '/maps/$mapId'
     | '/opportunities/$opportunityId'
     | '/projects/$projectId'
@@ -167,6 +178,7 @@ export interface FileRouteTypes {
     | '/projects'
     | '/prompts'
     | '/signup'
+    | '/watchlist'
     | '/maps/$mapId'
     | '/opportunities/$opportunityId'
     | '/projects/$projectId'
@@ -182,6 +194,7 @@ export interface RootRouteChildren {
   ProjectsRoute: typeof ProjectsRouteWithChildren
   PromptsRoute: typeof PromptsRoute
   SignupRoute: typeof SignupRoute
+  WatchlistRoute: typeof WatchlistRoute
   MapsMapIdRoute: typeof MapsMapIdRoute
   OpportunitiesOpportunityIdRoute: typeof OpportunitiesOpportunityIdRoute
 }
@@ -251,6 +264,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SignupRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/watchlist': {
+      id: '/watchlist'
+      path: '/watchlist'
+      fullPath: '/watchlist'
+      preLoaderRoute: typeof WatchlistRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/maps/$mapId': {
       id: '/maps/$mapId'
       path: '/maps/$mapId'
@@ -297,6 +317,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProjectsRoute: ProjectsRouteWithChildren,
   PromptsRoute: PromptsRoute,
   SignupRoute: SignupRoute,
+  WatchlistRoute: WatchlistRoute,
   MapsMapIdRoute: MapsMapIdRoute,
   OpportunitiesOpportunityIdRoute: OpportunitiesOpportunityIdRoute,
 }

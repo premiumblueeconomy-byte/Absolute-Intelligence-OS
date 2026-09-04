@@ -18,6 +18,7 @@ import { readinessLabel } from "@/lib/scoring";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { listMaps, createMap, type SystemMap } from "@/lib/system-maps";
 import { ResearchTab } from "@/components/project/ResearchTab";
+import { DecisionsTab } from "@/components/project/DecisionsTab";
 import { ArrowRight, Sprout, AlertTriangle, GitBranch, Plus } from "lucide-react";
 
 export default function ProjectWorkspace() {
@@ -61,6 +62,7 @@ export default function ProjectWorkspace() {
             <TabsTrigger value="opportunities">Opportunities ({opportunities.length})</TabsTrigger>
             <TabsTrigger value="systems">Systems</TabsTrigger>
             <TabsTrigger value="research">Research</TabsTrigger>
+            <TabsTrigger value="decisions">Decisions</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview">
@@ -81,6 +83,10 @@ export default function ProjectWorkspace() {
 
           <TabsContent value="research">
             <ResearchTab projectId={projectId} />
+          </TabsContent>
+
+          <TabsContent value="decisions">
+            <DecisionsTab projectId={projectId} />
           </TabsContent>
         </Tabs>
       </main>

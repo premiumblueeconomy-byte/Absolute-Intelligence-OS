@@ -421,6 +421,47 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["aiq_assessments"]["Row"]>;
         Relationships: [];
       };
+      decisions: {
+        Row: {
+          id: string;
+          project_id: string;
+          opportunity_id: string | null;
+          user_id: string;
+          decision: string;
+          decided_at: string;
+          decision_maker: string;
+          context: string;
+          options_considered: string;
+          evidence: string;
+          assumptions: string;
+          expected_outcome: string;
+          actual_outcome: string;
+          learning: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Omit<Database["public"]["Tables"]["decisions"]["Row"], "id" | "created_at" | "updated_at">> & { project_id: string; user_id: string; decision: string };
+        Update: Partial<Database["public"]["Tables"]["decisions"]["Row"]>;
+        Relationships: [];
+      };
+      watchlist_items: {
+        Row: {
+          id: string;
+          user_id: string;
+          project_id: string | null;
+          category:
+            | "market" | "company" | "technology" | "industry" | "regulation"
+            | "opportunity" | "price" | "country" | "resource";
+          label: string;
+          notes: string;
+          last_checked_at: string | null;
+          last_status: Json | null;
+          created_at: string;
+        };
+        Insert: Partial<Omit<Database["public"]["Tables"]["watchlist_items"]["Row"], "id" | "created_at">> & { user_id: string; label: string };
+        Update: Partial<Database["public"]["Tables"]["watchlist_items"]["Row"]>;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

@@ -113,3 +113,58 @@ export async function deleteEdge(id: string): Promise<void> {
   const { error } = await supabase.from("system_edges").delete().eq("id", id);
   if (error) throw error;
 }
+
+interface GeneratedNode { label: string; nodeType: NodeType }
+interface GeneratedEdge { sourceLabel: string; targetLabel: string; relationshipType: RelationshipType; description?: string }
+interface GeneratedMap { nodes: GeneratedNode[]; edges: GeneratedEdge[] }
+
+const CANVAS_W = 900;
+const CANVAS_H = 560;
+
+/**
+ * AI-assisted System Map generation (section 17). Nodes come back without
+ * positions, so they're laid out on a simple circle — the user can then
+ * drag them into a more meaningful arrangement.
+ */
+export async function generateSystemMap(mapId: string, subject: string): Promise<{ nodes: SystemNode[]; edges: SystemEdge[] }> {
+  const { data, error } = await supabase.functions.invoke<GeneratedMap>("systemmap-generate", { body: { subject } });
+  if (error) throw error;
+  if (!data?.nodes?.length) throw new Error("No nodes returned");
+
+  const cx = CANVAS_W / 2;
+  const cy = CANVAS_H / 2;
+  const radius = Math.min(CANVAS_W, CANVAS_H) / 2 - 60;
+  const labelToNode = new Map<string, SystemNode>();
+
+  const createdNodes: SystemNode[] = [];
+  for (let i = 0; i < data.nodes.length; i++) {
+    const n = data.nodes[i];
+    const angle = (2 * Math.PI * i) / data.nodes.length;
+    const node = await addNode({
+      mapId,
+      nodeType: n.nodeType,
+      label: n.label,
+      x: Math.round(cx + radius * Math.cos(angle)),
+      y: Math.round(cy + radius * Math.sin(angle)),
+    });
+    labelToNode.set(n.label, node);
+    createdNodes.push(node);
+  }
+
+  const createdEdges: SystemEdge[] = [];
+  for (const e of data.edges ?? []) {
+    const source = labelToNode.get(e.sourceLabel);
+    const target = labelToNode.get(e.targetLabel);
+    if (!source || !target) continue; // model referenced a label it didn't declare as a node
+    const edge = await addEdge({
+      mapId,
+      sourceNodeId: source.id,
+      targetNodeId: target.id,
+      relationshipType: e.relationshipType,
+      description: e.description,
+    });
+    createdEdges.push(edge);
+  }
+
+  return { nodes: createdNodes, edges: createdEdges };
+}
