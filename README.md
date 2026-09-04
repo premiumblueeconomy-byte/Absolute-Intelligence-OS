@@ -120,11 +120,15 @@ Vite + TanStack Start (React 19, SSR) + Supabase (Postgres, Auth, RLS) + Tailwin
 **not** using the spec's suggested Next.js/Clerk/FastAPI stack — this reuses a stack already
 proven to work, with no product-relevant difference for this build.
 
-The reasoning engine (`supabase/functions/ask-absolute`) is a single Anthropic Messages API call
-per workflow run, given the full core system prompt (spec section 56) plus the specific agent
+The reasoning engine (`supabase/functions/ask-absolute`) is a single DeepSeek chat-completions API
+call per workflow run, given the full core system prompt (spec section 56) plus the specific agent
 chain a workflow should apply, and required to return the structured JSON agent-output contract
 (spec section 25) — not a chat string. The `agents` list is threaded through the request/response
 so a future version can fan this out into one call per agent without changing the contract.
+`research-extract` and `systemmap-generate` use the same DeepSeek call shape. One real limitation
+from this choice: DeepSeek's API has no native PDF/document understanding (Anthropic's does), so
+Research-to-Enterprise only accepts .txt/.md/.csv uploads now — a PDF upload fails with a clear
+error rather than silently mishandling the file.
 
 ## Setup
 
@@ -138,8 +142,9 @@ so a future version can fan this out into one call per agent without changing th
 4. **Set the reasoning engine's secret** on the Supabase project (not in `.env` — it must never
    reach the client bundle):
    ```
-   supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
+   supabase secrets set DEEPSEEK_API_KEY=sk-...
    ```
+   (`AIOS_MODEL` optionally overrides the model — defaults to `deepseek-chat`.)
 5. **Deploy the edge functions**:
    ```
    supabase functions deploy ask-absolute research-extract systemmap-generate

@@ -1,9 +1,12 @@
 // Research-to-Enterprise Engine (spec section 20) — extraction call.
 //
-// Accepts either a base64-encoded PDF (native Anthropic PDF document
-// support — no separate PDF-parsing library needed) or plain text
-// (.txt/.md/.csv), and returns a structured commercialization assessment,
-// not a summary paragraph.
+// Uses DeepSeek's chat completions API (OpenAI-compatible shape), not
+// Anthropic's Messages API. IMPORTANT LIMITATION: unlike Anthropic's API,
+// DeepSeek's chat completions endpoint has no native PDF/document
+// understanding — it is text-only. Plain text (.txt/.md/.csv) uploads still
+// work exactly as before; a PDF upload now fails with a clear 400 explaining
+// why, rather than silently sending unusable base64 bytes as if they were
+// text (which would produce a garbage extraction, not an honest error).
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
@@ -52,7 +55,7 @@ the commercial story looks exciting.`;
 interface RequestBody {
   fileName: string;
   mimeType: string;
-  /** Either base64 PDF bytes (mimeType === "application/pdf") or plain text otherwise. */
+  /** Plain text only — DeepSeek's chat API has no native PDF understanding. */
   content: string;
 }
 
@@ -68,38 +71,39 @@ serve(async (req) => {
       });
     }
 
-    const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
+    if (body.mimeType === "application/pdf") {
+      return new Response(
+        JSON.stringify({
+          error: "PDF uploads are not supported with the DeepSeek model — its API has no native document/PDF understanding (unlike Anthropic's, which this platform used previously). Please upload the document as .txt, .md or .csv instead.",
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    const apiKey = Deno.env.get("DEEPSEEK_API_KEY");
     if (!apiKey) {
-      return new Response(JSON.stringify({ error: "ANTHROPIC_API_KEY is not configured on this Supabase project" }), {
+      return new Response(JSON.stringify({ error: "DEEPSEEK_API_KEY is not configured on this Supabase project" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const model = Deno.env.get("AIOS_MODEL") || "claude-sonnet-4-5-20250929";
-    const isPdf = body.mimeType === "application/pdf";
+    const model = Deno.env.get("AIOS_MODEL") || "deepseek-chat";
 
-    const userContent = isPdf
-      ? [
-          { type: "document", source: { type: "base64", media_type: "application/pdf", data: body.content } },
-          { type: "text", text: `Extract the structured commercialization assessment from "${body.fileName}".` },
-        ]
-      : [
-          { type: "text", text: `Document "${body.fileName}":\n\n${body.content}\n\nExtract the structured commercialization assessment.` },
-        ];
-
-    const resp = await fetch("https://api.anthropic.com/v1/messages", {
+    const resp = await fetch("https://api.deepseek.com/chat/completions", {
       method: "POST",
       headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
+        Authorization: `Bearer ${apiKey}`,
         "content-type": "application/json",
       },
       body: JSON.stringify({
         model,
         max_tokens: 6000,
-        system: SYSTEM_PROMPT,
-        messages: [{ role: "user", content: userContent }],
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          { role: "user", content: `Document "${body.fileName}":\n\n${body.content}\n\nExtract the structured commercialization assessment.` },
+        ],
       }),
     });
 
@@ -112,7 +116,7 @@ serve(async (req) => {
     }
 
     const data = await resp.json();
-    const rawText: string = data?.content?.[0]?.text ?? "";
+    const rawText: string = data?.choices?.[0]?.message?.content ?? "";
 
     let parsed: unknown;
     try {

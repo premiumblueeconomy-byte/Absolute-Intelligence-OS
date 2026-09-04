@@ -13,6 +13,9 @@
 // The `agents` list is threaded through the prompt and echoed back in the
 // response so a future version can fan this out into one call per agent
 // without changing the request/response contract.
+//
+// Uses DeepSeek's chat completions API (OpenAI-compatible shape: Bearer
+// auth, choices[0].message.content), not Anthropic's Messages API.
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
@@ -128,28 +131,30 @@ serve(async (req) => {
       });
     }
 
-    const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
+    const apiKey = Deno.env.get("DEEPSEEK_API_KEY");
     if (!apiKey) {
-      return new Response(JSON.stringify({ error: "ANTHROPIC_API_KEY is not configured on this Supabase project" }), {
+      return new Response(JSON.stringify({ error: "DEEPSEEK_API_KEY is not configured on this Supabase project" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const model = Deno.env.get("AIOS_MODEL") || "claude-sonnet-4-5-20250929";
+    const model = Deno.env.get("AIOS_MODEL") || "deepseek-chat";
 
-    const resp = await fetch("https://api.anthropic.com/v1/messages", {
+    const resp = await fetch("https://api.deepseek.com/chat/completions", {
       method: "POST",
       headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
+        Authorization: `Bearer ${apiKey}`,
         "content-type": "application/json",
       },
       body: JSON.stringify({
         model,
         max_tokens: 8000,
-        system: CORE_SYSTEM_PROMPT,
-        messages: [{ role: "user", content: buildUserPrompt(body) }],
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: CORE_SYSTEM_PROMPT },
+          { role: "user", content: buildUserPrompt(body) },
+        ],
       }),
     });
 
@@ -162,7 +167,7 @@ serve(async (req) => {
     }
 
     const data = await resp.json();
-    const rawText: string = data?.content?.[0]?.text ?? "";
+    const rawText: string = data?.choices?.[0]?.message?.content ?? "";
 
     let parsed: unknown;
     try {
