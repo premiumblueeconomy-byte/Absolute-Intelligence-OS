@@ -73,9 +73,20 @@ Phase 2 is too:
   owner-only in this pass (multi-writer conflict handling is separate, later work), and uploaded
   research-document *files* stay owner-only (only the row/metadata is shared) since the storage
   bucket policy keys off the uploader's own folder path.
+- **Global Opportunity Atlas** — every opportunity you can see (own + org-shared) in one
+  cross-project view: filter by country, industry, status and minimum score; sort by score,
+  confidence or recency; a clickable by-country summary strip. All grouping/aggregation is
+  computed client-side over data you already have — no separate geo/analytics service.
+- **Intelligence Graph** — a cross-project graph of every project, resource, problem and
+  opportunity you can see. Solid edges are real foreign keys (project owns resource/problem;
+  resource or problem sourced an opportunity); dashed edges are a computed "related market" —
+  two opportunities in *different* projects that share the same country and industry. Explicitly
+  not AI-generated and not semantic/vector similarity (see "Not yet built" below) — every edge
+  traces to a real field match, and the UI says so.
 
-**Not yet built** (Phase 3/4 per the spec's own priority order): Global Opportunity Atlas,
-Intelligence Graph, vector search, i18n, admin panel, billing/subscriptions.
+**Not yet built** (Phase 3/4 per the spec's own priority order): vector/semantic search (would
+need an embeddings provider — Anthropic's API doesn't serve embeddings, so this needs a new
+API key and a schema change, not just code), i18n, admin panel, billing/subscriptions.
 
 ## Stack
 

@@ -12,7 +12,9 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AiqRouteImport } from './routes/aiq'
 import { Route as AskRouteImport } from './routes/ask'
+import { Route as AtlasRouteImport } from './routes/atlas'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as GraphRouteImport } from './routes/graph'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as OrganizationsRouteImport } from './routes/organizations'
@@ -40,9 +42,19 @@ const AskRoute = AskRouteImport.update({
   path: '/ask',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AtlasRoute = AtlasRouteImport.update({
+  id: '/atlas',
+  path: '/atlas',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GraphRoute = GraphRouteImport.update({
+  id: '/graph',
+  path: '/graph',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -106,7 +118,9 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/aiq': typeof AiqRoute
   '/ask': typeof AskRoute
+  '/atlas': typeof AtlasRoute
   '/dashboard': typeof DashboardRoute
+  '/graph': typeof GraphRoute
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
   '/organizations': typeof OrganizationsRouteWithChildren
@@ -123,7 +137,9 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/aiq': typeof AiqRoute
   '/ask': typeof AskRoute
+  '/atlas': typeof AtlasRoute
   '/dashboard': typeof DashboardRoute
+  '/graph': typeof GraphRoute
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
   '/organizations': typeof OrganizationsRouteWithChildren
@@ -141,7 +157,9 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/aiq': typeof AiqRoute
   '/ask': typeof AskRoute
+  '/atlas': typeof AtlasRoute
   '/dashboard': typeof DashboardRoute
+  '/graph': typeof GraphRoute
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
   '/organizations': typeof OrganizationsRouteWithChildren
@@ -160,7 +178,9 @@ export interface FileRouteTypes {
     | '/'
     | '/aiq'
     | '/ask'
+    | '/atlas'
     | '/dashboard'
+    | '/graph'
     | '/login'
     | '/onboarding'
     | '/organizations'
@@ -177,7 +197,9 @@ export interface FileRouteTypes {
     | '/'
     | '/aiq'
     | '/ask'
+    | '/atlas'
     | '/dashboard'
+    | '/graph'
     | '/login'
     | '/onboarding'
     | '/organizations'
@@ -194,7 +216,9 @@ export interface FileRouteTypes {
     | '/'
     | '/aiq'
     | '/ask'
+    | '/atlas'
     | '/dashboard'
+    | '/graph'
     | '/login'
     | '/onboarding'
     | '/organizations'
@@ -212,7 +236,9 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AiqRoute: typeof AiqRoute
   AskRoute: typeof AskRoute
+  AtlasRoute: typeof AtlasRoute
   DashboardRoute: typeof DashboardRoute
+  GraphRoute: typeof GraphRoute
   LoginRoute: typeof LoginRoute
   OnboardingRoute: typeof OnboardingRoute
   OrganizationsRoute: typeof OrganizationsRouteWithChildren
@@ -247,11 +273,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AskRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/atlas': {
+      id: '/atlas'
+      path: '/atlas'
+      fullPath: '/atlas'
+      preLoaderRoute: typeof AtlasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dashboard': {
       id: '/dashboard'
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/graph': {
+      id: '/graph'
+      path: '/graph'
+      fullPath: '/graph'
+      preLoaderRoute: typeof GraphRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -362,7 +402,9 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AiqRoute: AiqRoute,
   AskRoute: AskRoute,
+  AtlasRoute: AtlasRoute,
   DashboardRoute: DashboardRoute,
+  GraphRoute: GraphRoute,
   LoginRoute: LoginRoute,
   OnboardingRoute: OnboardingRoute,
   OrganizationsRoute: OrganizationsRouteWithChildren,

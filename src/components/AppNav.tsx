@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Sparkles, Compass, Briefcase, BookOpen, Brain, Eye, Building2, LogOut } from "lucide-react";
+import { Sparkles, Compass, Briefcase, BookOpen, Brain, Eye, Building2, Globe2, Network, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 
@@ -23,6 +23,8 @@ export function AppNav() {
             <NavLink to="/projects" icon={Briefcase} label="Projects" />
             <NavLink to="/prompts" icon={BookOpen} label="Prompt Library" />
             <NavLink to="/ask" icon={Compass} label="Ask Absolute" />
+            <NavLink to="/atlas" icon={Globe2} label="Atlas" />
+            <NavLink to="/graph" icon={Network} label="Graph" />
             <NavLink to="/aiq" icon={Brain} label="AIQ" />
             <NavLink to="/watchlist" icon={Eye} label="Watchlist" />
             <NavLink to="/organizations" icon={Building2} label="Organizations" />
