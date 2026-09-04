@@ -138,7 +138,12 @@ error rather than silently mishandling the file.
    `supabase link` then `supabase db push`, or paste them into the SQL editor in order).
 3. **Copy `.env.example` to `.env.development`** and fill in your project's URL and anon
    (`publishable`) key — both the `VITE_`-prefixed and unprefixed versions are read (see
-   `vite.config.ts`).
+   `vite.config.ts`). Note: `npm run build` runs in Vite's `production` mode, which does **not**
+   read `.env.development` — only `npm run dev` does. For a *local* production build (`npm run
+   build && npm run start` or similar), also copy the same values into a plain `.env` (loaded in
+   every mode) or `.env.production`. This doesn't affect Vercel: its dashboard env vars are
+   injected into `process.env` directly for both the build and the running app, regardless of
+   this file-based mode distinction.
 4. **Set the reasoning engine's secret** on the Supabase project (not in `.env` — it must never
    reach the client bundle):
    ```
@@ -165,6 +170,26 @@ skip them and everything else still works:
   then register `https://<project-ref>.supabase.co/functions/v1/stripe-webhook` as a webhook
   endpoint in the Stripe dashboard and `supabase secrets set STRIPE_WEBHOOK_SECRET=whsec_...`
   with the signing secret Stripe gives you for it.
+
+## Deploying to Vercel
+
+The TanStack Start Vite plugin version this project uses has no built-in Vercel preset — it emits
+a Node "fetch handler" (`dist/server/server.js`, exporting `{ fetch(request): Promise<Response> }`)
+and a client asset bundle, but no static `dist/index.html` (the HTML shell is rendered
+per-request, server-side). Vercel's zero-config Vite detection expects a static `index.html` and
+has no way to run that handler on its own — every route 404s without an adapter.
+
+`vercel.json` and `api/index.js` are that adapter: `vercel.json` sets the build output to
+`dist/client` and rewrites every non-asset path to the `/api` serverless function; `api/index.js`
+bridges Vercel's Node `(req, res)` handler shape to the Fetch `Request`/`Response` the built
+handler expects. This was verified locally (not just assumed) by running the built handler behind
+a real Node HTTP server and confirming a full server-rendered page comes back — but it hasn't been
+verified through an actual Vercel deploy from this environment, so treat it as a strong starting
+point rather than a guarantee; report back whatever Vercel's build/runtime logs show if it still
+fails; that's the fastest path to a fix.
+
+In the Vercel project's **Environment Variables**, set `VITE_SUPABASE_URL` and
+`VITE_SUPABASE_PUBLISHABLE_KEY` (values from Settings → API in your Supabase dashboard).
 
 ## Verifying against the MVP acceptance criteria
 
