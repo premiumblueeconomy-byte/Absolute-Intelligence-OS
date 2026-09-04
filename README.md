@@ -1,0 +1,104 @@
+# Absolute Intelligence OS (AIOS)
+
+Discover Reality. Connect Knowledge. Unlock Opportunity. Execute Better.
+
+A global opportunity intelligence operating system: give it a resource, problem, technology,
+market, location, research finding, business idea or question, and it returns **structured,
+evidence-graded intelligence objects** — Projects, Opportunities, Claims, Evidence, Assumptions,
+Unknowns — not a chat transcript. See `docs/spec.md` (not included here; keep your master build
+spec alongside this repo) for the full product philosophy.
+
+## What's built
+
+Per the phased build priority in the spec (section 52), Phase 1 is complete and most of
+Phase 2 is too:
+
+- Auth + persona-based onboarding (10 personas, each tunes default scoring weights)
+- Home dashboard (active projects, opportunity radar)
+- Projects (create, list, workspace with Overview / Discover / Opportunities tabs)
+- **Ask Absolute** — conversational interface across the 10 intelligence modes (Understand,
+  Investigate, Map, Discover, Compare, Challenge, Forecast, Build, Invest, Learn), each mapped to
+  its own agent chain
+- **Resource Explorer** and **Problem Explorer** — the two discovery workflows, each producing
+  persisted Opportunity objects, not just prose
+- **Opportunity Genome** — the full structured opportunity object with tabs for Overview,
+  Scoring (editable weights + radar chart), and Assumptions/Unknowns/Claims/Evidence
+- **Opportunity scoring engine** — the weighted 0-100 formula from the spec, with the Opportunity
+  Score and Confidence Score always shown separately (never merged)
+- **Prompt Library** — all 50 flagship prompts from the spec, each wired to a real agent-chain
+  workflow (not a raw pass-through to the model)
+- **Report generator** — assembles an Absolute Intelligence Report from a project + opportunity
+  and exports it to PDF
+- **Red Team engine** — "Attack This Idea" runs a 10-perspective adversarial critique (skeptical
+  investor, engineer, scientist, customer, competitor, regulator, financial/environmental/
+  operational/supply-chain analyst), persisted per opportunity, with vulnerabilities grouped by
+  perspective, conditions required for success, and experiments required before investment
+- **Execution Engine** — converts an opportunity into the spec's default phased roadmap
+  (0–30 days / 31–90 days / Month 4–6 / Month 7–12 / Year 2), with tasks (owner, status, priority,
+  budget, deadline, dependency, KPI)
+- **Scenario Lab** — Baseline/Optimistic/Adverse/Black Swan/Transformative scenarios with
+  user-defined variables and a transparent sensitivity model (explicitly not a fabricated
+  financial forecast) that recomputes projected margin and opportunity score
+- **System Mapping Studio** — a drag-and-connect node/edge canvas (15 node types, 15 relationship
+  types per the spec) per project, manual for now (no AI-assisted auto-generation yet — see below)
+- **Experiment Engine** — a dedicated Experiment object (hypothesis, dangerous assumption, method,
+  success metric, actual result, learning) with its own status pipeline (Draft → Planned → Running
+  → Completed/Failed/Validated/Invalidated), with a one-click "Track" action turning any Red Team
+  "experiment required" line into a tracked experiment
+- **Research-to-Enterprise upload** — upload a PDF (native Anthropic PDF document understanding,
+  no separate parsing library), TXT, MD or CSV research document; extracts a structured
+  commercialization assessment (research question, methodology, findings, limitations, TRL +
+  rationale, potential products/applications/customers, required validation, commercialization
+  roadmap) with a "Create Opportunity" action
+
+- **Signature interactions** — "Unlock Further" on any opportunity ("What have we not yet
+  considered?") appends genuinely new, distinct opportunities instead of repeating what's already
+  found; "Question the Question" in Ask Absolute reframes your question instead of answering it —
+  hidden assumptions, what's missing, alternative framings, the deeper question
+- **AIQ** — a 20-question self-assessment across the spec's 10 intelligence domains, with the
+  0-100 classification bands (Reactive → Theoretical Absolute Intelligence), strengths/weaknesses,
+  targeted exercises, and historical progress across retakes
+
+**Not yet built** (Phase 2 remainder + Phase 3/4 per the spec's own priority order):
+AI-assisted System Map generation, Organizations/Collaboration, Global Opportunity Atlas,
+Intelligence Graph, vector search, i18n, admin panel, billing.
+
+## Stack
+
+Vite + TanStack Start (React 19, SSR) + Supabase (Postgres, Auth, RLS) + Tailwind v4. Deliberately
+**not** using the spec's suggested Next.js/Clerk/FastAPI stack — this reuses a stack already
+proven to work, with no product-relevant difference for this build.
+
+The reasoning engine (`supabase/functions/ask-absolute`) is a single Anthropic Messages API call
+per workflow run, given the full core system prompt (spec section 56) plus the specific agent
+chain a workflow should apply, and required to return the structured JSON agent-output contract
+(spec section 25) — not a chat string. The `agents` list is threaded through the request/response
+so a future version can fan this out into one call per agent without changing the contract.
+
+## Setup
+
+1. **Create a Supabase project** at [supabase.com](https://supabase.com) (or via whatever platform
+   you use to provision one).
+2. **Run the migrations** in `supabase/migrations/` against it, in order (via the Supabase CLI:
+   `supabase link` then `supabase db push`, or paste them into the SQL editor in order).
+3. **Copy `.env.example` to `.env.development`** and fill in your project's URL and anon
+   (`publishable`) key — both the `VITE_`-prefixed and unprefixed versions are read (see
+   `vite.config.ts`).
+4. **Set the reasoning engine's secret** on the Supabase project (not in `.env` — it must never
+   reach the client bundle):
+   ```
+   supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
+   ```
+5. **Deploy the edge function**:
+   ```
+   supabase functions deploy ask-absolute
+   ```
+6. `npm install && npm run dev`
+
+## Verifying against the MVP acceptance criteria
+
+The spec's own acceptance test: register → pick Entrepreneur → create a project called
+"Coconut Shell Ghana" → Resource Explorer → "coconut shell" / Ghana → run the analysis → get a
+resource cascade and 5+ opportunities → open one → see its Opportunity Genome, scores,
+assumptions and unknowns → generate a report. That whole path is wired end-to-end in this repo;
+it just needs a live Supabase project and an Anthropic API key to actually run.
