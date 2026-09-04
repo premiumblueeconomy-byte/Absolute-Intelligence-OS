@@ -219,6 +219,16 @@ body {
   display: none;
 }
 
+/* Fine grid texture for hero/section backgrounds — restrained, not decorative;
+   a single subtle structural cue rather than a gradient/glow treatment. */
+@utility bg-grid {
+  background-image:
+    linear-gradient(to right, hsl(var(--foreground) / 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, hsl(var(--foreground) / 0.05) 1px, transparent 1px);
+  background-size: 40px 40px;
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, black 40%, transparent 100%);
+}
+
 @media (pointer: coarse) {
   button,
   [role="tab"],
