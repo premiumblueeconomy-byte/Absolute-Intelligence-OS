@@ -3,7 +3,8 @@ import type { Database } from "@/integrations/supabase/types";
 import type { Opportunity } from "@/lib/opportunities";
 import type { Project } from "@/lib/projects";
 import { listAssumptions, listUnknowns, listClaims, listEvidence } from "@/lib/opportunities";
-import { readinessLabel } from "@/lib/scoring";
+import { readinessLabel, DIMENSION_LABEL } from "@/lib/scoring";
+import { opportunityDims } from "@/lib/opportunities";
 
 export type Report = Database["public"]["Tables"]["reports"]["Row"];
 
@@ -14,6 +15,9 @@ export interface ReportContent {
   executiveSummary: string;
   currentReality: string;
   criticalFacts: string[];
+  claimsToValidate?: string[];
+  commercialDetails?: { label: string; text: string }[];
+  scores?: { label: string; value: number }[];
   assumptions: { statement: string; validation_method: string }[];
   unknowns: { question: string; why_it_matters: string }[];
   opportunityPortfolio: {
@@ -45,7 +49,16 @@ export async function assembleOpportunityReport(project: Project, opportunity: O
     generatedAt: new Date().toISOString(),
     executiveSummary: opportunity.summary,
     currentReality: project.objective || "No stated objective on this project yet.",
-    criticalFacts: claims.filter((c) => c.claim_type === "fact").map((c) => c.statement),
+    criticalFacts: claims.filter((c) => c.claim_type === "fact" && c.status === "verified").map((c) => c.statement),
+    claimsToValidate: claims.filter((c) => !(c.claim_type === "fact" && c.status === "verified")).map((c) => `${c.statement} (Status: ${c.status.replace(/_/g, " ")}; confidence ${c.confidence}/100)`),
+    commercialDetails: [
+      { label: "Transformation", text: opportunity.transformation },
+      { label: "Products", text: opportunity.products.join("; ") },
+      { label: "Applications", text: opportunity.applications.join("; ") },
+      { label: "Customers", text: opportunity.customers.join("; ") },
+      { label: "Markets", text: opportunity.markets.join("; ") },
+    ],
+    scores: Object.entries(opportunityDims(opportunity)).map(([key, value]) => ({ label: DIMENSION_LABEL[key as keyof typeof DIMENSION_LABEL], value })),
     assumptions: assumptions.map((a) => ({ statement: a.statement, validation_method: a.validation_method })),
     unknowns: unknowns.map((u) => ({ question: u.question, why_it_matters: u.why_it_matters })),
     opportunityPortfolio: [
@@ -64,7 +77,7 @@ export async function assembleOpportunityReport(project: Project, opportunity: O
     confidenceSummary: `Opportunity score ${opportunity.opportunity_score}/100. Confidence ${opportunity.confidence_score}/100 — ${
       opportunity.confidence_score < 50
         ? "an attractive-looking opportunity is not yet investment-ready; treat the score as a hypothesis."
-        : "reasonably evidence-backed for its current pipeline stage."
+        : "review the underlying evidence and unresolved assumptions before making an investment decision."
     }`,
   };
 }
@@ -99,3 +112,4 @@ export async function getReport(id: string): Promise<Report | null> {
   if (error) throw error;
   return data;
 }
+
