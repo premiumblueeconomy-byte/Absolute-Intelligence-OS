@@ -221,3 +221,11 @@ through trusted database administration. Never put a service-role key in a VITE_
 variable.
 
 Validation: `npm test`, `npx tsc --noEmit`, and `npm run build`.
+
+The browser client includes the selected project's public URL and publishable key
+as defaults in `src/integrations/supabase/public-config.ts`. This lets the sign-in
+screen load when Vercel has no VITE_SUPABASE_* variables. To use a different
+project, override both variables together. No secret or service-role key is
+included. Server-only administrative operations still require their own secrets.
+Run `node scripts/smoke-auth.mjs` after building to verify that login/signup render
+and protected dashboard content is withheld during server rendering.
