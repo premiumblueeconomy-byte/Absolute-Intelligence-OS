@@ -27,7 +27,7 @@ Deno.serve(async (req: Request) => {
     const key = Deno.env.get('DEEPSEEK_API_KEY');
     if (!key) return reply({ error: 'AI generation is not configured. Add the DeepSeek API key in Supabase function secrets.' }, 503);
     const reserved = await fetch(`${Deno.env.get('SUPABASE_URL')}/rest/v1/rpc/reserve_generation`, {
-      method: 'POST', headers: { Authorization: authorization, apikey: Deno.env.get('SUPABASE_ANON_KEY')!, 'Content-Type': 'application/json' }, body: '{}', signal: AbortSignal.timeout(10000),
+      method: 'POST', headers: { Authorization: authorization, apikey: Deno.env.get('SUPABASE_ANON_KEY')!, 'Content-Type': 'application/json', 'Content-Profile': 'public', 'Accept-Profile': 'public' }, body: '{}', signal: AbortSignal.timeout(10000),
     });
     if (!reserved.ok) {
       const failure = await reserved.json();
@@ -74,9 +74,10 @@ Deno.serve(async (req: Request) => {
     if (reservation) {
       try {
         const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-        const done = await fetch(`${Deno.env.get('SUPABASE_URL')}/rest/v1/rpc/finish_generation`, { method: 'POST', headers: { Authorization: `Bearer ${key}`, apikey: key, 'Content-Type': 'application/json' }, body: JSON.stringify({p_id: reservation, p_success: succeeded}), signal: AbortSignal.timeout(10000) });
+        const done = await fetch(`${Deno.env.get('SUPABASE_URL')}/rest/v1/rpc/finish_generation`, { method: 'POST', headers: { Authorization: `Bearer ${key}`, apikey: key, 'Content-Type': 'application/json', 'Content-Profile': 'public', 'Accept-Profile': 'public' }, body: JSON.stringify({p_id: reservation, p_success: succeeded}), signal: AbortSignal.timeout(10000) });
         if (!done.ok) console.error(JSON.stringify({requestId, error:'Usage finalization failed'}));
       } catch { console.error(JSON.stringify({requestId, error:'Usage finalization unavailable'})); }
     }
   }
 });
+

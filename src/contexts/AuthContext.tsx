@@ -62,7 +62,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     if (!user?.id) { setProfileLoading(false); return; }
-    setProfileLoading(true);
+    // Token refresh updates access without discarding drafts or in-flight work.
+    // Account changes and explicit retries set the loading gate separately.
     setProfileError(false);
     void (async () => {
       try {
@@ -96,3 +97,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     </AuthContext.Provider>
   );
 }
+
