@@ -15,11 +15,14 @@ import {
 import type { AgentOutput } from "@/lib/ask-absolute";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { Send, HelpCircle } from "lucide-react";
+import { useNavigate } from "@tanstack/react-router";
 
 type Turn = { role: "user" | "assistant"; content: string; result?: AgentOutput };
 
 export default function Ask() {
   const { ready } = useRequireAuth();
+  const navigate = useNavigate();
+  const savingOpportunity = useRef(false);
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectId, setProjectId] = useState<string>("");
   const [mode, setMode] = useState<ConversationMode>("understand");
@@ -91,13 +94,16 @@ export default function Ask() {
   };
 
   const createOpportunity = async (result: AgentOutput, index: number) => {
-    if (!projectId) { toast.error("Pick a project first"); return; }
+    if (savingOpportunity.current) return;
+    savingOpportunity.current = true;
     try {
-      await saveOpportunityFromMessage({ projectId, result, opportunityIndex: index });
+      const saved = await saveOpportunityFromMessage({ projectId, result, opportunityIndex: index });
+      setProjectId(saved.projectId);
       toast.success("Opportunity saved");
+      void navigate({ to: "/opportunities/$opportunityId", params: { opportunityId: saved.opportunityId } });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not save opportunity");
-    }
+    } finally { savingOpportunity.current = false; }
   };
 
   return (
@@ -111,7 +117,7 @@ export default function Ask() {
             onChange={(e) => setProjectId(e.target.value)}
             className="h-8 rounded-md border border-input bg-background px-2 text-xs"
           >
-            <option value="">No project (not saved)</option>
+            <option value="">Create a project when saving an opportunity</option>
             {projects.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
           </select>
         </div>
@@ -144,7 +150,7 @@ export default function Ask() {
               </div>
             </div>
           ))}
-          <WorkflowProgress active={sending} />
+          <WorkflowProgress active={sending} swarm />
           <div ref={bottomRef} />
         </div>
 
@@ -245,3 +251,4 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     </div>
   );
 }
+

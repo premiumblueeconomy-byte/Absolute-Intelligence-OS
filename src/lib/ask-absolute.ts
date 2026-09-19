@@ -40,6 +40,7 @@ export interface AgentOpportunity {
 
 /** The agent output contract — section 25 of the spec. */
 export interface AgentOutput {
+  swarm?: { strategy: string; agents: string[]; disagreements: string[] };
   summary: string;
   findings: string[];
   claims: AgentClaim[];
@@ -68,7 +69,13 @@ export async function runIntelligenceWorkflow(input: {
   const { data, error } = await supabase.functions.invoke<AskAbsoluteResponse>("ask-absolute", {
     body: { mode: input.mode, agents: input.agents, input: input.prompt, context: input.context },
   });
-  if (error) throw error;
+  if (error) {
+    if ('context' in error && error.context instanceof Response) {
+      const payload = await error.context.clone().json().catch(() => null);
+      if (typeof payload?.error === 'string') throw new Error(payload.error);
+    }
+    throw error;
+  }
   if (!data?.result) throw new Error("No result returned from the reasoning engine");
   return data.result;
 }
