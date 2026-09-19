@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useParams, Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { AppNav } from "@/components/AppNav";
@@ -16,7 +16,6 @@ import {
 import { getProject, type Project } from "@/lib/projects";
 import { DEFAULT_WEIGHTS, DIMENSION_LABEL, readinessLabel, type ScoreDimensions } from "@/lib/scoring";
 import { assembleOpportunityReport, saveReport } from "@/lib/reports";
-import { exportReportPdf } from "@/lib/report-pdf";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { unlockFurther } from "@/lib/unlock-further";
 import { WorkflowProgress } from "@/components/WorkflowProgress";
@@ -24,7 +23,7 @@ import { RedTeamTab } from "@/components/opportunity/RedTeamTab";
 import { ExecutionTab } from "@/components/opportunity/ExecutionTab";
 import { ScenariosTab } from "@/components/opportunity/ScenariosTab";
 import { ExperimentsTab } from "@/components/opportunity/ExperimentsTab";
-import { FileDown, Loader2, Sparkles } from "lucide-react";
+import { FileDown, Presentation, Loader2, Sparkles } from "lucide-react";
 
 const STATUS_OPTIONS: Opportunity["status"][] = [
   "signal", "discovered", "hypothesis", "investigating", "validating",
@@ -50,7 +49,8 @@ export default function OpportunityDetail() {
   const [claims, setClaims] = useState<Claim[]>([]);
   const [evidence, setEvidence] = useState<Evidence[]>([]);
   const [weights, setWeights] = useState<Record<keyof ScoreDimensions, number>>(DEFAULT_WEIGHTS);
-  const [exporting, setExporting] = useState(false);
+  const [exporting, setExporting] = useState<'pdf' | 'pptx' | null>(null);
+  const exportLock = useRef(false);
 
   const load = async () => {
     const o = await getOpportunity(opportunityId);
@@ -100,18 +100,31 @@ export default function OpportunityDetail() {
     }
   };
 
-  const generateReport = async () => {
-    if (!opportunity || !project) return;
-    setExporting(true);
+  const generateReport = async (format: 'pdf' | 'pptx') => {
+    if (!opportunity || !project || exportLock.current) return;
+    exportLock.current = true;
+    setExporting(format);
     try {
       const content = await assembleOpportunityReport(project, opportunity);
-      await saveReport({ projectId: project.id, opportunityId: opportunity.id, title: content.title, content });
-      exportReportPdf(content);
-      toast.success("Report downloaded");
+      if (format === 'pdf') {
+        const { exportReportPdf } = await import('@/lib/report-pdf');
+        exportReportPdf(content);
+      } else {
+        const { exportReportPptx } = await import('@/lib/report-pptx');
+        await exportReportPptx(content);
+      }
+      toast.success(`${format.toUpperCase()} download started`);
+      // A history-write failure must never prevent a requested download.
+      try {
+        await saveReport({ projectId: project.id, opportunityId: opportunity.id, title: content.title, content });
+      } catch {
+        toast.warning('Download started, but the report could not be added to project history.');
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not generate report");
     } finally {
-      setExporting(false);
+      exportLock.current = false;
+      setExporting(null);
     }
   };
 
@@ -161,9 +174,14 @@ export default function OpportunityDetail() {
           <Badge>Opportunity {opportunity.opportunity_score}/100</Badge>
           <Badge variant="outline">Confidence {opportunity.confidence_score}/100</Badge>
           <Badge variant="outline">{readiness.label}</Badge>
-          <Button size="sm" variant="outline" onClick={generateReport} disabled={exporting} className="ml-auto">
-            {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileDown className="w-3.5 h-3.5" />} Generate report
-          </Button>
+          <div className="flex flex-wrap gap-2 ml-auto">
+            <Button size="sm" variant="outline" onClick={() => void generateReport('pdf')} disabled={exporting !== null || !project}>
+              {exporting === 'pdf' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileDown className="w-3.5 h-3.5" />} {exporting === 'pdf' ? 'Preparing PDF…' : 'Download PDF'}
+            </Button>
+            <Button size="sm" variant="accent" onClick={() => void generateReport('pptx')} disabled={exporting !== null || !project}>
+              {exporting === 'pptx' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Presentation className="w-3.5 h-3.5" />} {exporting === 'pptx' ? 'Preparing PowerPoint…' : 'Download PowerPoint'}
+            </Button>
+          </div>
         </div>
 
         {opportunity.confidence_score < 50 && (
@@ -369,3 +387,4 @@ function TagList({ label, items }: { label: string; items: string[] }) {
 function Empty({ text }: { text: string }) {
   return <p className="text-sm text-muted-foreground">{text}</p>;
 }
+
