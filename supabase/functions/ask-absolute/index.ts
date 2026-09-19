@@ -1,196 +1,61 @@
-// Absolute Intelligence OS — reasoning engine edge function.
-//
-// One HTTP call per workflow run. Takes an intelligence-mode input plus the
-// agent chain the calling workflow should apply (section 33: "prompt ->
-// workflow", section 24: 16 logical agents), and returns ONE structured JSON
-// object matching the agent output contract (section 25) — never a raw
-// chat string. This is what makes AI output a persistent, queryable object
-// instead of a chat transcript.
-//
-// Deliberately a single model call today ("These may initially use one AI
-// model with different system prompts. Architect code so separate
-// models/providers can later be routed to different agents" — section 24).
-// The `agents` list is threaded through the prompt and echoed back in the
-// response so a future version can fan this out into one call per agent
-// without changing the request/response contract.
-//
-// Uses DeepSeek's chat completions API (OpenAI-compatible shape: Bearer
-// auth, choices[0].message.content), not Anthropic's Messages API.
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { runSwarm } from './swarm.ts';
+import { CORE_SYSTEM_PROMPT } from './prompt.ts';
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
+const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
 
-const AGENT_ROLE: Record<string, string> = {
-  reality_agent: "REALITY AGENT — establish present, verifiable facts. Separate what is currently true from what is assumed.",
-  evidence_agent: "EVIDENCE AGENT — evaluate the reliability of supporting sources. Flag anything you cannot verify.",
-  science_agent: "SCIENCE AGENT — analyze the underlying scientific or technical mechanism.",
-  causal_agent: "CAUSAL AGENT — identify root causes, not just symptoms, and the feedback loops that sustain them.",
-  systems_agent: "SYSTEMS AGENT — map actors, resources, flows, constraints and relationships as a system.",
-  resource_agent: "RESOURCE AGENT — decompose the resource into components, properties, functions and transformation pathways.",
-  technology_agent: "TECHNOLOGY AGENT — identify relevant technologies, processes and their technology-readiness level.",
-  market_agent: "MARKET AGENT — analyze customers, demand, competitors and market structure.",
-  financial_agent: "FINANCIAL AGENT — develop CAPEX/OPEX/revenue economics and unit economics.",
-  opportunity_agent: "OPPORTUNITY AGENT — generate concrete, named opportunities from everything above.",
-  foresight_agent: "FORESIGHT AGENT — explore plausible future scenarios and weak signals.",
-  risk_agent: "RISK AGENT — attack the idea. Identify the assumptions most capable of making it fail.",
-  strategy_agent: "STRATEGY AGENT — rank options and identify the highest-leverage path.",
-  execution_agent: "EXECUTION AGENT — convert the strategy into a concrete, phased roadmap with owners and dates.",
-  learning_agent: "LEARNING AGENT — compare prediction with outcome where past data exists.",
-  integrator_agent: "INTEGRATOR AGENT — resolve disagreements between the above and produce the single final structured output.",
-};
-
-const CORE_SYSTEM_PROMPT = `You are the reasoning engine of Absolute Intelligence OS.
-
-Your purpose is not merely to answer questions. Your responsibility is to improve the user's ability to understand reality, identify relationships, discover opportunities, make better decisions and execute effectively.
-
-For every substantial analysis:
-1. Clarify the actual question. Reframe it when necessary.
-2. Separate established facts from assumptions.
-3. Identify evidence gaps.
-4. Explain causal mechanisms.
-5. Identify system relationships.
-6. Search for hidden connections.
-7. Generate possible transformations.
-8. Generate economically, scientifically, socially or strategically useful opportunities.
-9. Distinguish established possibilities from speculative ones.
-10. Identify risks and contradictions.
-11. Quantify where defensible.
-12. Never invent statistics.
-13. Never invent sources.
-14. State uncertainty.
-15. Challenge attractive ideas.
-16. Identify the most dangerous assumptions.
-17. Recommend validation experiments.
-18. Rank opportunities.
-19. Convert conclusions into specific actions.
-
-Use these epistemic labels where appropriate: VERIFIED, PROBABLE, NEEDS_VALIDATION, WEAK_EVIDENCE, UNKNOWN, CONTRADICTED.
-Always distinguish: FACT, INFERENCE, ASSUMPTION, HYPOTHESIS, PREDICTION, RECOMMENDATION.
-
-When evaluating opportunities, consider: market, resources, technology, competition, economics, execution, strategic importance, regulation, environmental consequences, social consequences, time horizon, uncertainty.
-
-The final objective is not maximum novelty. The final objective is useful, evidence-grounded, actionable intelligence.
-
-You MUST respond with a single JSON object matching exactly this shape (no prose outside the JSON, no markdown fences):
-{
-  "summary": string,
-  "findings": string[],
-  "claims": [{"statement": string, "claim_type": "fact"|"inference"|"assumption"|"hypothesis"|"prediction"|"recommendation", "confidence": number, "status": "verified"|"probable"|"needs_validation"|"weak_evidence"|"unknown"|"contradicted"}],
-  "evidence_needed": string[],
-  "assumptions": [{"statement": string, "validation_method": string}],
-  "unknowns": [{"question": string, "why_it_matters": string}],
-  "risks": string[],
-  "opportunities": [{
-    "title": string, "summary": string, "transformation": string,
-    "products": string[], "applications": string[], "customers": string[], "markets": string[],
-    "market_attractiveness": number, "resource_availability": number, "technology_readiness": number,
-    "competitive_advantage": number, "financial_attractiveness": number, "execution_feasibility": number,
-    "strategic_importance": number, "employment_potential": number, "trade_potential": number, "regenerative_impact": number,
-    "recommended_next_action": string
-  }],
-  "recommendations": string[],
-  "confidence": number,
-  "next_actions": string[]
-}
-All numeric scores are 0-100. "confidence" is your OVERALL confidence in this analysis given the evidence actually available to you — a high-quality, well-evidenced analysis of a narrow question can score high; a broad analysis resting on assumptions should score low, even if the opportunities look attractive. Never inflate confidence to make the output look more useful.`;
-
-interface RequestBody {
-  mode?: string;
-  agents?: string[];
-  input: string;
-  context?: Record<string, unknown>;
-}
-
-function buildUserPrompt(body: RequestBody): string {
-  const agents = body.agents?.length ? body.agents : ["reality_agent", "opportunity_agent", "integrator_agent"];
-  const roleLines = agents.map((a) => `- ${AGENT_ROLE[a] ?? a}`).join("\n");
-  const contextLine = body.context && Object.keys(body.context).length
-    ? `\nContext: ${JSON.stringify(body.context)}`
-    : "";
-  return `Mode: ${body.mode ?? "understand"}
-Apply these analytical lenses in sequence, then have the INTEGRATOR resolve them into one final structured output:
-${roleLines}
-${contextLine}
-
-Request:
-${body.input}`;
-}
-
-serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
-
+Deno.serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') return new Response(null, { headers: cors });
+  if (req.method !== 'POST') return reply({ error: 'Use POST' }, 405);
+  const requestId = crypto.randomUUID();
   try {
-    const body = (await req.json()) as RequestBody;
-    if (!body?.input?.trim()) {
-      return new Response(JSON.stringify({ error: "input is required" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const apiKey = Deno.env.get("DEEPSEEK_API_KEY");
-    if (!apiKey) {
-      return new Response(JSON.stringify({ error: "DEEPSEEK_API_KEY is not configured on this Supabase project" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const model = Deno.env.get("AIOS_MODEL") || "deepseek-chat";
-
-    const resp = await fetch("https://api.deepseek.com/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: 8000,
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: CORE_SYSTEM_PROMPT },
-          { role: "user", content: buildUserPrompt(body) },
-        ],
-      }),
+    const authorization = req.headers.get('authorization');
+    if (!authorization?.startsWith('Bearer ')) return reply({ error: 'Please sign in to generate opportunities.' }, 401);
+    const auth = await fetch(`${Deno.env.get('SUPABASE_URL')}/auth/v1/user`, {
+      headers: { Authorization: authorization, apikey: Deno.env.get('SUPABASE_ANON_KEY')! },
+      signal: AbortSignal.timeout(10000),
     });
-
-    if (!resp.ok) {
-      const text = await resp.text();
-      return new Response(JSON.stringify({ error: `Model call failed: ${resp.status} ${text}` }), {
-        status: 502,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const data = await resp.json();
-    const rawText: string = data?.choices?.[0]?.message?.content ?? "";
-
-    let parsed: unknown;
+    if (!auth.ok || !(await auth.json())?.id) return reply({ error: 'Your session expired. Please sign in again.' }, 401);
+    const raw = await req.text();
+    if (raw.length > 60000) return reply({ error: 'The request is too large.' }, 413);
+    let body;
+    try { body = JSON.parse(raw); } catch { return reply({ error: 'Invalid JSON request.' }, 400); }
+    if (typeof body?.input !== 'string' || !body.input.trim() || body.input.length > 20000) return reply({ error: 'Enter a request under 20,000 characters.' }, 400);
+    if (body.agents !== undefined && (!Array.isArray(body.agents) || body.agents.length > 20 || body.agents.some((a: unknown) => typeof a !== 'string' || a.length > 100))) return reply({ error: 'Invalid workflow selection.' }, 400);
+    const key = Deno.env.get('DEEPSEEK_API_KEY');
+    if (!key) return reply({ error: 'AI generation is not configured. Add the DeepSeek API key in Supabase function secrets.' }, 503);
+    const controller = new AbortController();
+    const deadline = setTimeout(() => controller.abort(), 130000);
     try {
-      parsed = JSON.parse(rawText);
-    } catch {
-      // Model wrapped the JSON in prose or fences despite instructions — recover it.
-      const match = rawText.match(/\{[\s\S]*\}/);
-      if (!match) {
-        return new Response(JSON.stringify({ error: "Model did not return valid JSON", raw: rawText }), {
-          status: 502,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+      const result = await runSwarm(JSON.stringify({ mode: body.mode ?? 'discover', input: body.input, requested_lenses: body.agents ?? [], context: body.context ?? {} }), CORE_SYSTEM_PROMPT,
+        async (role, system, input, maxTokens) => {
+          console.info(JSON.stringify({ requestId, stage: role, status: 'started' }));
+          const response = await fetch('https://api.deepseek.com/chat/completions', {
+            method: 'POST', signal: AbortSignal.any([controller.signal, AbortSignal.timeout(role === 'integrator' ? 55000 : 35000)]),
+            headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model: Deno.env.get('AIOS_MODEL') || 'deepseek-chat', max_tokens: maxTokens, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: system }, { role: 'user', content: input }] }),
+          });
+          if (!response.ok) {
+            console.error(JSON.stringify({ requestId, stage: role, status: response.status }));
+            throw new Error(response.status === 402 ? 'AI provider balance is insufficient. Please top up the DeepSeek account.' : response.status === 429 ? 'AI generation is busy. Please try again shortly.' : 'The AI provider could not complete the analysis. Please try again.');
+          }
+          const output = await response.json();
+          const choice = output?.choices?.[0];
+          if (choice?.finish_reason === 'length') throw new Error('The analysis was too long. Please narrow your request and try again.');
+          const text = choice?.message?.content;
+          if (typeof text !== 'string' || !text.trim()) throw new Error('The AI returned an empty response. Please retry.');
+          const parsed = JSON.parse(text.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, ''));
+          console.info(JSON.stringify({ requestId, stage: role, status: 'completed' }));
+          return parsed;
         });
-      }
-      parsed = JSON.parse(match[0]);
-    }
-
-    return new Response(JSON.stringify({ agents: body.agents ?? [], mode: body.mode ?? "understand", result: parsed }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+      if (body.mode === 'discover' && result.opportunities.length === 0) return reply({ error: 'No viable opportunities were found. Add more detail and try again.' }, 422);
+      return reply({ agents: result.swarm.agents, mode: body.mode ?? 'discover', result });
+    } finally { clearTimeout(deadline); controller.abort(); }
   } catch (error) {
-    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    const timeout = error instanceof Error && ['TimeoutError', 'AbortError'].includes(error.name);
+    const invalid = error instanceof Error && ['ZodError', 'SyntaxError'].includes(error.name);
+    const message = timeout ? 'The swarm analysis timed out. Try a narrower prompt.' : invalid ? 'An agent returned an incomplete analysis. Please retry.' : error instanceof Error ? error.message : 'Generation failed. Please try again.';
+    console.error(JSON.stringify({ requestId, error: message }));
+    return reply({ error: message, requestId }, timeout ? 504 : 502);
   }
 });

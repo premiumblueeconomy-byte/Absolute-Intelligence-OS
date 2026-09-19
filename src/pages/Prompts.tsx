@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { AppNav } from "@/components/AppNav";
 import { Card } from "@/components/ui/card";
@@ -14,6 +15,9 @@ import { useRequireAuth } from "@/hooks/useRequireAuth";
 
 export default function Prompts() {
   const { ready } = useRequireAuth();
+  const navigate = useNavigate();
+  const savingRef = useRef(false);
+  const [saving, setSaving] = useState<number | null>(null);
   const [prompts, setPrompts] = useState<PromptTemplate[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectId, setProjectId] = useState("");
@@ -31,13 +35,17 @@ export default function Prompts() {
   const groups = groupByCategory(prompts);
 
   const openPrompt = (p: PromptTemplate) => {
+    if (running || savingRef.current) return;
     setActive(p);
     setValues({});
     setResult(null);
   };
 
   const run = async () => {
-    if (!active) return;
+    if (!active || running) return;
+    if (extractPlaceholders(active.template).some((ph) => !values[ph]?.trim())) {
+      toast.error("Fill in the prompt fields first."); return;
+    }
     setRunning(true);
     setResult(null);
     try {
@@ -57,14 +65,17 @@ export default function Prompts() {
   };
 
   const createOpportunity = async (index: number) => {
-    if (!result) return;
-    if (!projectId) { toast.error("Pick a project first"); return; }
+    if (!result || savingRef.current) return;
+    savingRef.current = true;
+    setSaving(index);
     try {
-      await saveOpportunityFromMessage({ projectId, result, opportunityIndex: index });
+      const saved = await saveOpportunityFromMessage({ projectId, result, opportunityIndex: index });
+      setProjectId(saved.projectId);
       toast.success("Opportunity saved");
+      void navigate({ to: "/opportunities/$opportunityId", params: { opportunityId: saved.opportunityId } });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not save opportunity");
-    }
+    } finally { savingRef.current = false; setSaving(null); }
   };
 
   return (
@@ -74,15 +85,17 @@ export default function Prompts() {
         <div className="flex items-center justify-between gap-3 mb-1">
           <h1 className="text-2xl font-black">Prompt Library</h1>
           <select
+            aria-label="Project for new opportunities"
+            disabled={running || saving !== null}
             value={projectId}
             onChange={(e) => setProjectId(e.target.value)}
             className="h-8 rounded-md border border-input bg-background px-2 text-xs"
           >
-            <option value="">No project (not saved)</option>
+            <option value="">Create a project automatically</option>
             {projects.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
           </select>
         </div>
-        <p className="text-sm text-muted-foreground mb-6">50 flagship prompts, each wired to its own agent workflow.</p>
+        <p className="text-sm text-muted-foreground mb-6">Generate opportunities with specialist agents, a critical review, and a combined recommendation. Creating an opportunity also creates its project unless you select one.</p>
 
         <div className="grid md:grid-cols-2 gap-6">
           <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-1">
@@ -123,20 +136,21 @@ export default function Prompts() {
                     <Input value={values[ph] ?? ""} onChange={(e) => setValues((v) => ({ ...v, [ph]: e.target.value }))} />
                   </div>
                 ))}
-                <Button onClick={run} disabled={running} variant="accent">{running ? "Running…" : "Run this prompt"}</Button>
-                <WorkflowProgress active={running} />
+                <Button onClick={run} disabled={running || saving !== null} variant="accent">{running ? "Generating…" : "Generate with swarm intelligence"}</Button>
+                <WorkflowProgress active={running} swarm />
 
                 {result && (
                   <div className="pt-2 space-y-3 border-t border-border">
                     <p className="text-sm">{result.summary}</p>
+                    {result.swarm && <Badge variant="outline">{result.swarm.agents.length} agents · cross-reviewed</Badge>}
                     {result.opportunities.map((o, i) => (
                       <div key={i} className="flex items-center justify-between gap-2 rounded-md border border-border p-2">
                         <div className="min-w-0">
                           <div className="text-xs font-bold truncate">{o.title}</div>
                           <div className="text-[11px] text-muted-foreground truncate">{o.summary}</div>
                         </div>
-                        <Button size="sm" variant="outline" className="shrink-0 h-7 text-xs" onClick={() => createOpportunity(i)}>
-                          Create Opportunity
+                        <Button size="sm" variant="outline" disabled={saving !== null} className="shrink-0 h-7 text-xs" onClick={() => createOpportunity(i)}>
+                          {saving === i ? "Creating…" : "Create Opportunity"}
                         </Button>
                       </div>
                     ))}
@@ -151,3 +165,4 @@ export default function Prompts() {
     </div>
   );
 }
+

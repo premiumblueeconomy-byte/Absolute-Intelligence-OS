@@ -229,3 +229,25 @@ project, override both variables together. No secret or service-role key is
 included. Server-only administrative operations still require their own secrets.
 Run `node scripts/smoke-auth.mjs` after building to verify that login/signup render
 and protected dashboard content is withheld during server rendering.
+
+## Swarm opportunity generation
+
+`ask-absolute` now runs three independent specialist model calls in parallel
+(discovery, markets, and evidence), then a critic reviews all three, and an
+integrator creates a validated shortlist. These are five role-specific calls to
+the configured DeepSeek model, not five independent data sources. No live web
+research is performed; model agreement never marks a claim verified. Calls have
+bounded timeouts and invalid or incomplete agent output is rejected.
+
+In Prompt Library and Ask Absolute, Create Opportunity uses the selected project
+or creates a new private project from the opportunity title and summary. The app
+opens the saved opportunity. Prompt Library disables duplicate save clicks and
+requires placeholder fields before generation. The progress text describes the
+workflow without inventing current stage completion.
+
+Deploy `supabase/functions/ask-absolute` with its `deno.json`, `contracts.ts`,
+`prompt.ts`, and `swarm.ts`. Keep JWT verification enabled; the handler also checks
+the user with Supabase Auth before any model call. Existing DEEPSEEK_API_KEY and
+optional AIOS_MODEL secrets continue to be used. Swarm generation uses five model
+calls per request instead of one. Run `npm test` for concurrency, output validation,
+automatic project creation, and existing-project save coverage.

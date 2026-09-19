@@ -1,3 +1,4 @@
+import { createProject } from "@/lib/projects";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { runIntelligenceWorkflow, type AgentOutput } from "@/lib/ask-absolute";
@@ -117,14 +118,15 @@ export async function sendMessage(input: {
 
 /** "Create Opportunity" action button (section 6): persist one AI-surfaced opportunity from a chat turn. */
 export async function saveOpportunityFromMessage(input: {
-  projectId: string;
+  projectId?: string;
   result: AgentOutput;
   opportunityIndex: number;
-}): Promise<void> {
+}): Promise<{ projectId: string; opportunityId: string }> {
   const opp = input.result.opportunities[input.opportunityIndex];
   if (!opp) throw new Error("No such opportunity in this message");
+  const projectId = input.projectId || (await createProject({ title: opp.title, objective: opp.summary })).id;
   const created = await persistOpportunities({
-    projectId: input.projectId,
+    projectId,
     sourceType: "manual",
     opportunities: [opp],
     confidenceScore: input.result.confidence,
@@ -133,5 +135,7 @@ export async function saveOpportunityFromMessage(input: {
     await persistAssumptions(o.id, input.result.assumptions);
     await persistUnknowns(o.id, input.result.unknowns);
   }
-  await persistClaims(input.projectId, created[0]?.id ?? null, input.result.claims);
+  if (!created[0]) throw new Error("The opportunity could not be saved. Please retry.");
+  await persistClaims(projectId, created[0].id, input.result.claims);
+  return { projectId, opportunityId: created[0].id };
 }
