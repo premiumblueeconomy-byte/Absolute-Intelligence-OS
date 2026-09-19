@@ -17,10 +17,14 @@ export default function Login() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setLoading(false);
-    if (error) { toast.error(error.message); return; }
-    void navigate({ to: "/dashboard" });
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+
+      if (error) { toast.error(error.message); return; }
+      void navigate({ to: "/dashboard" });
+    } catch {
+      toast.error("Unable to sign in. Please try again.");
+    } finally { setLoading(false); }
   };
 
   return (
