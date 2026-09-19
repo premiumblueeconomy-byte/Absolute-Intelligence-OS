@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useTranslation } from "@/lib/i18n";
+import { PlatformNotice } from "./PlatformNotice";
 import { toast } from "sonner";
 
 export function AppNav() {
@@ -38,6 +39,7 @@ export function AppNav() {
 
         <div className="flex items-center gap-2 shrink-0">
           <LanguageSwitcher />
+          {profile?.is_platform_admin && <Link to="/admin" className="md:hidden p-2" aria-label="Admin console"><ShieldAlert className="w-4 h-4" /></Link>}
           {user ? (
             <>
               <Link to="/billing" className="text-muted-foreground hover:text-foreground p-2" aria-label="Billing">
@@ -66,6 +68,7 @@ export function AppNav() {
           )}
         </div>
       </div>
+      <PlatformNotice />
     </header>
   );
 }

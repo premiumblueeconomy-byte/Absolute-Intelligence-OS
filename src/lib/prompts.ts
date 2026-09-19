@@ -9,7 +9,7 @@ export async function listPromptTemplates(): Promise<PromptTemplate[]> {
   // Keyset pagination also works when the server's row limit is below our batch size.
   while (true) {
     const { data, error } = await supabase.from("prompt_templates").select("*")
-      .gt("prompt_number", after).order("prompt_number").limit(250);
+      .eq("is_active", true).gt("prompt_number", after).order("prompt_number").limit(250);
     if (error) throw error;
     if (!data?.length) return prompts;
     prompts.push(...data);
@@ -50,4 +50,3 @@ export function extractPlaceholders(template: string): string[] {
   const matches = template.match(/\[([A-Z /]+)\]/g) ?? [];
   return [...new Set(matches.map((m) => m.slice(1, -1)))];
 }
-

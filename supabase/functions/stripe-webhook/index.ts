@@ -1,89 +1,97 @@
-// Billing/subscriptions (Phase 3/4). Receives Stripe's webhook events and
-// keeps public.subscriptions in sync. Stripe calls this directly — there is
-// no Supabase user session on the request — so this is the one edge
-// function in this project that uses the service-role key, and it must
-// have verify_jwt disabled (see supabase/config.toml) since Stripe cannot
-// send a Supabase JWT.
-//
-// Requires STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET (from the webhook's
-// own settings page in the Stripe dashboard, after registering
-// https://<project>.supabase.co/functions/v1/stripe-webhook as the
-// endpoint) — with either missing, this returns a clear 500 instead of
-// silently accepting unverified events.
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import Stripe from "https://esm.sh/stripe@17?target=deno";
-
-function json(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
-}
-
-function mapStripeStatus(s: string): "active" | "trialing" | "past_due" | "canceled" {
-  if (s === "trialing") return "trialing";
-  if (s === "past_due" || s === "unpaid") return "past_due";
-  if (s === "canceled" || s === "incomplete_expired") return "canceled";
-  return "active";
-}
-
-function planFromPriceId(priceId: string | undefined): "pro" | "enterprise" | "free" {
-  if (priceId && priceId === Deno.env.get("STRIPE_PRICE_PRO")) return "pro";
-  if (priceId && priceId === Deno.env.get("STRIPE_PRICE_ENTERPRISE")) return "enterprise";
-  return "free";
-}
-
-serve(async (req) => {
+import { Stripe, db, stripeClient, reply } from "../_shared/billing.ts";
+import { billingStatus, paidPlan } from "../_shared/billing-policy.ts";
+Deno.serve(async (req: Request) => {
+  if (req.method !== "POST") return reply({ error: "Use POST" }, 405);
+  const signature = req.headers.get("stripe-signature");
+  const secret = Deno.env.get("STRIPE_WEBHOOK_SECRET");
+  if (!signature) return reply({ error: "Signature required" }, 400);
+  if (!secret) return reply({ error: "Webhook not configured" }, 503);
+  let event: Stripe.Event;
+  let stripe: Stripe;
   try {
-    const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
-    const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET");
-    if (!stripeKey || !webhookSecret) {
-      return json({ error: "STRIPE_SECRET_KEY / STRIPE_WEBHOOK_SECRET are not configured on this Supabase project" }, 500);
-    }
-
-    const signature = req.headers.get("stripe-signature");
-    if (!signature) return json({ error: "Missing stripe-signature header" }, 400);
-
-    const stripe = new Stripe(stripeKey, { apiVersion: "2024-06-20" });
-    const rawBody = await req.text();
-
-    let event: Stripe.Event;
-    try {
-      event = await stripe.webhooks.constructEventAsync(rawBody, signature, webhookSecret);
-    } catch (err) {
-      return json({ error: `Invalid signature: ${err instanceof Error ? err.message : "unknown"}` }, 400);
-    }
-
-    const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-
-    switch (event.type) {
-      case "checkout.session.completed": {
-        const session = event.data.object as Stripe.Checkout.Session;
-        const userId = session.client_reference_id ?? session.metadata?.user_id;
-        if (userId && session.customer) {
-          await supabase.from("subscriptions").update({
-            stripe_customer_id: String(session.customer),
-            stripe_subscription_id: session.subscription ? String(session.subscription) : null,
-            status: "active",
-          }).eq("user_id", userId);
-        }
-        break;
-      }
-      case "customer.subscription.updated":
-      case "customer.subscription.deleted": {
-        const subscription = event.data.object as Stripe.Subscription;
-        const deleted = event.type === "customer.subscription.deleted";
-        await supabase.from("subscriptions").update({
-          plan: deleted ? "free" : planFromPriceId(subscription.items.data[0]?.price?.id),
-          status: deleted ? "canceled" : mapStripeStatus(subscription.status),
-          current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-        }).eq("stripe_customer_id", String(subscription.customer));
-        break;
-      }
-      default:
-        break;
-    }
-
-    return json({ received: true });
-  } catch (error) {
-    return json({ error: error instanceof Error ? error.message : "Unknown error" }, 500);
+    stripe = stripeClient();
+    event = await stripe.webhooks.constructEventAsync(
+      await req.text(),
+      signature,
+      secret,
+      undefined,
+      Stripe.createSubtleCryptoProvider(),
+    );
+  } catch {
+    return reply({ error: "Invalid webhook signature" }, 400);
+  }
+  try {
+    const database = db();
+    let subscriptionId: string | undefined;
+    if (
+      [
+        "customer.subscription.created",
+        "customer.subscription.updated",
+        "customer.subscription.deleted",
+      ].includes(event.type)
+    )
+      subscriptionId = (event.data.object as Stripe.Subscription).id;
+    else if (
+      [
+        "checkout.session.completed",
+        "checkout.session.async_payment_succeeded",
+        "checkout.session.async_payment_failed",
+      ].includes(event.type)
+    ) {
+      const s = event.data.object as Stripe.Checkout.Session;
+      subscriptionId =
+        typeof s.subscription === "string"
+          ? s.subscription
+          : s.subscription?.id;
+    } else return reply({ received: true });
+    if (!subscriptionId) return reply({ received: true });
+    // Fetch current provider state so delayed delivery cannot restore an obsolete paid status.
+    const s = await stripe.subscriptions.retrieve(subscriptionId);
+    const customer =
+      typeof s.customer === "string" ? s.customer : s.customer.id;
+    const { data: local, error: le } = await database
+      .from("subscriptions")
+      .select("user_id,stripe_customer_id")
+      .eq("stripe_customer_id", customer)
+      .maybeSingle();
+    if (le) throw le;
+    if (!local) return reply({ received: true, ignored: "Unmanaged customer" });
+    if (s.metadata.user_id !== local.user_id)
+      throw new Error("Subscription owner mismatch");
+    const { data: mappings, error: me } = await database
+      .from("billing_price_history")
+      .select("price_id,plan_id");
+    if (me) throw me;
+    const plan = paidPlan(
+      s.items.data.map((i) => i.price.id),
+      mappings || [],
+    );
+    if (!plan)
+      console.error(
+        "Unmapped subscription price; denying paid entitlement",
+        s.id,
+      );
+    const end = Math.min(...s.items.data.map((i) => i.current_period_end));
+    if (!Number.isFinite(end)) throw new Error("Missing subscription period");
+    const { error } = await database.rpc("apply_billing_event", {
+      p_event_id: event.id,
+      p_event_type: event.type,
+      p_created: event.created,
+      p_user: local.user_id,
+      p_customer: customer,
+      p_subscription: s.id,
+      p_plan: plan || "free",
+      p_status: plan ? billingStatus(s.status) : "past_due",
+      p_period_end: new Date(end * 1000).toISOString(),
+      p_cancel: s.cancel_at_period_end,
+    });
+    if (error) throw error;
+    return reply({ received: true });
+  } catch (e) {
+    console.error(
+      "Billing reconciliation failed",
+      e instanceof Error ? e.message : "Unknown error",
+    );
+    return reply({ error: "Unable to synchronize subscription" }, 500);
   }
 });

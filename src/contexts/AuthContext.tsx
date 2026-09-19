@@ -49,6 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setProfileLoading(!!nextId);
         setProfileError(false);
       }
+      if (_event === "TOKEN_REFRESHED") setProfileVersion(v => v + 1);
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);

@@ -52,3 +52,14 @@ describe('protected pages', () => {
     expect(render()).toContain('PRIVATE CONTENT');
   });
 });
+
+describe('account regulation',()=>{
+ it('blocks suspended users even if they hold administrator access',()=>{
+  state.auth.user={id:'a'};state.auth.profile={onboarded:true,is_platform_admin:true,account_status:'suspended',suspension_reason:'Account under review'};
+  state.path='/admin';expect(render()).not.toContain('PRIVATE CONTENT');expect(render()).toContain('Account under review');
+ });
+ it('lets suspended users manage and cancel subscriptions',()=>{
+  state.auth.user={id:'a'};state.auth.profile={onboarded:false,account_status:'suspended'};
+  state.path='/billing';expect(render()).toContain('PRIVATE CONTENT');
+ });
+});

@@ -8,6 +8,8 @@ Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: cors });
   if (req.method !== 'POST') return reply({ error: 'Use POST' }, 405);
   const requestId = crypto.randomUUID();
+  let reservation: string | null = null;
+  let succeeded = false;
   try {
     const authorization = req.headers.get('authorization');
     if (!authorization?.startsWith('Bearer ')) return reply({ error: 'Please sign in to generate opportunities.' }, 401);
@@ -24,6 +26,16 @@ Deno.serve(async (req: Request) => {
     if (body.agents !== undefined && (!Array.isArray(body.agents) || body.agents.length > 20 || body.agents.some((a: unknown) => typeof a !== 'string' || a.length > 100))) return reply({ error: 'Invalid workflow selection.' }, 400);
     const key = Deno.env.get('DEEPSEEK_API_KEY');
     if (!key) return reply({ error: 'AI generation is not configured. Add the DeepSeek API key in Supabase function secrets.' }, 503);
+    const reserved = await fetch(`${Deno.env.get('SUPABASE_URL')}/rest/v1/rpc/reserve_generation`, {
+      method: 'POST', headers: { Authorization: authorization, apikey: Deno.env.get('SUPABASE_ANON_KEY')!, 'Content-Type': 'application/json' }, body: '{}', signal: AbortSignal.timeout(10000),
+    });
+    if (!reserved.ok) {
+      const failure = await reserved.json();
+      const known = ['Your account is not active.', 'Generation is temporarily paused. Please try again later.', 'Monthly generation limit reached. Review your plan on the Billing page.'];
+      const message = known.includes(failure.message) ? failure.message : 'Unable to check generation access. Please try again.';
+      return reply({error: message}, failure.code === '42501' ? 403 : message.includes('limit') ? 429 : 503);
+    }
+    reservation = await reserved.json();
     const controller = new AbortController();
     const deadline = setTimeout(() => controller.abort(), 130000);
     try {
@@ -49,6 +61,7 @@ Deno.serve(async (req: Request) => {
           return parsed;
         });
       if (body.mode === 'discover' && result.opportunities.length === 0) return reply({ error: 'No viable opportunities were found. Add more detail and try again.' }, 422);
+      succeeded = true;
       return reply({ agents: result.swarm.agents, mode: body.mode ?? 'discover', result });
     } finally { clearTimeout(deadline); controller.abort(); }
   } catch (error) {
@@ -57,5 +70,13 @@ Deno.serve(async (req: Request) => {
     const message = timeout ? 'The swarm analysis timed out. Try a narrower prompt.' : invalid ? 'An agent returned an incomplete analysis. Please retry.' : error instanceof Error ? error.message : 'Generation failed. Please try again.';
     console.error(JSON.stringify({ requestId, error: message }));
     return reply({ error: message, requestId }, timeout ? 504 : 502);
+  } finally {
+    if (reservation) {
+      try {
+        const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+        const done = await fetch(`${Deno.env.get('SUPABASE_URL')}/rest/v1/rpc/finish_generation`, { method: 'POST', headers: { Authorization: `Bearer ${key}`, apikey: key, 'Content-Type': 'application/json' }, body: JSON.stringify({p_id: reservation, p_success: succeeded}), signal: AbortSignal.timeout(10000) });
+        if (!done.ok) console.error(JSON.stringify({requestId, error:'Usage finalization failed'}));
+      } catch { console.error(JSON.stringify({requestId, error:'Usage finalization unavailable'})); }
+    }
   }
 });
