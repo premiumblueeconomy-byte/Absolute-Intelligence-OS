@@ -3,6 +3,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { createRootRouteWithContext, HeadContent, Outlet, Scripts, useRouter } from "@tanstack/react-router";
 import { Toaster } from "sonner";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { AuthGate } from "@/components/AuthGate";
 import { LanguageProvider } from "@/lib/i18n";
 import appCss from "../styles.css?url";
 
@@ -48,7 +49,7 @@ function RootComponent() {
       <Toaster richColors position="top-center" />
       <LanguageProvider>
         <AuthProvider>
-          <Outlet />
+          <AuthGate><Outlet /></AuthGate>
         </AuthProvider>
       </LanguageProvider>
     </QueryClientProvider>

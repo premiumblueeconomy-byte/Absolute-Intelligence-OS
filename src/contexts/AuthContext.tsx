@@ -1,4 +1,5 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useRef, useCallback, ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
@@ -10,6 +11,7 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   profile: Profile | null;
+  profileError: boolean;
   refreshProfile: () => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -19,6 +21,7 @@ const AuthContext = createContext<AuthContextType>({
   session: null,
   loading: true,
   profile: null,
+  profileError: false,
   refreshProfile: async () => {},
   signOut: async () => {},
 });
@@ -30,44 +33,64 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<Profile | null>(null);
-
-  const fetchProfile = async (userId: string) => {
-    const { data } = await supabase.from("profiles").select("*").eq("id", userId).single();
-    if (data) setProfile(data);
-  };
+  const [profileError, setProfileError] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [profileVersion, setProfileVersion] = useState(0);
+  const currentUserId = useRef<string | null>(null);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        void fetchProfile(session.user.id);
-      } else {
+      const nextId = session?.user.id ?? null;
+      if (currentUserId.current !== nextId) {
+        currentUserId.current = nextId;
+        queryClient.clear();
         setProfile(null);
+        setProfileLoading(!!nextId);
+        setProfileError(false);
       }
-      setLoading(false);
-    });
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      if (session?.user) void fetchProfile(session.user.id);
       setLoading(false);
     });
-
+    // INITIAL_SESSION is delivered by the subscription; a second getSession
+    // request can race with sign-out and restore stale account state.
     return () => subscription.unsubscribe();
-  }, []);
+  }, [queryClient]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!user?.id) { setProfileLoading(false); return; }
+    setProfileLoading(true);
+    setProfileError(false);
+    void (async () => {
+      try {
+        const { data, error } = await supabase.from("profiles").select("*").eq("id", user.id).single();
+        if (!cancelled) {
+          setProfile(data ?? null);
+          setProfileError(!!error || !data);
+        }
+      } catch {
+        if (!cancelled) { setProfile(null); setProfileError(true); }
+      } finally {
+        if (!cancelled) setProfileLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id, profileVersion]);
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
   };
 
-  const refreshProfile = async () => {
-    if (user) await fetchProfile(user.id);
-  };
+  const refreshProfile = useCallback(async () => {
+    setProfileLoading(true);
+    setProfileVersion((version) => version + 1);
+  }, []);
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, profile, refreshProfile, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading: loading || (!!user && profileLoading), profile, profileError, refreshProfile, signOut }}>
       {children}
     </AuthContext.Provider>
   );

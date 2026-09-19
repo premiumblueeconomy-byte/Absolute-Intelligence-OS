@@ -198,3 +198,34 @@ The spec's own acceptance test: register → pick Entrepreneur → create a proj
 resource cascade and 5+ opportunities → open one → see its Opportunity Genome, scores,
 assumptions and unknowns → generate a report. That whole path is wired end-to-end in this repo;
 it just needs a live Supabase project and an Anthropic API key to actually run.
+
+## Authentication and protected pages
+
+Supabase email/password authentication is used for sign-in and signup. Signup with
+email confirmation enabled directs users to check their inbox before signing in.
+In Supabase Auth URL Configuration, set the Site URL to your production origin and
+allow that origin's `/login` URL (and `http://localhost:5173/login` for development).
+The production app is https://absolute-intelligence-os.vercel.app.
+
+The shared AuthGate leaves only `/`, `/login`, and `/signup` public. Other pages
+wait for session and profile loading before mounting. Users without completed
+onboarding are sent to `/onboarding`. The admin page requires the database-backed
+admin flag. Supabase RLS and authenticated backend checks enforce data access;
+the browser gate alone is not a data authorization boundary.
+
+After provisioning a database with the schema migrations, run
+`supabase/harden-profile-permissions.sql`. It prevents users from editing their
+administrator flag while retaining profile editing and onboarding. This script
+has already been applied to project `afzyivlffdrdiqrrimeu`. Set admin status only
+through trusted database administration. Never put a service-role key in a VITE_
+variable.
+
+Validation: `npm test`, `npx tsc --noEmit`, and `npm run build`.
+
+The browser client includes the selected project's public URL and publishable key
+as defaults in `src/integrations/supabase/public-config.ts`. This lets the sign-in
+screen load when Vercel has no VITE_SUPABASE_* variables. To use a different
+project, override both variables together. No secret or service-role key is
+included. Server-only administrative operations still require their own secrets.
+Run `node scripts/smoke-auth.mjs` after building to verify that login/signup render
+and protected dashboard content is withheld during server rendering.

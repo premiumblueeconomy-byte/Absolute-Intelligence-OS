@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useTranslation } from "@/lib/i18n";
+import { toast } from "sonner";
 
 export function AppNav() {
   const { user, profile, signOut } = useAuth();
@@ -45,7 +46,10 @@ export function AppNav() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => { void signOut(); void navigate({ to: "/" }); }}
+                onClick={async () => {
+                  try { await signOut(); await navigate({ to: "/" }); }
+                  catch { toast.error("Unable to sign out. Please try again."); }
+                }}
               >
                 <LogOut className="w-4 h-4" /> {t("nav.signOut")}
               </Button>
