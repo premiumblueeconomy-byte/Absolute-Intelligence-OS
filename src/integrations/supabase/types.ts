@@ -30,6 +30,8 @@ export interface Database {
           objectives: string[];
           onboarded: boolean;
           is_platform_admin: boolean;
+          account_status: "active" | "suspended";
+          suspension_reason: string;
           created_at: string;
           updated_at: string;
         };
@@ -244,6 +246,7 @@ export interface Database {
         Row: {
           id: string;
           prompt_number: number;
+          is_active: boolean;
           category: string;
           template: string;
           workflow: string[];
@@ -520,6 +523,7 @@ export interface Database {
           stripe_customer_id: string | null;
           stripe_subscription_id: string | null;
           current_period_end: string | null;
+          cancel_at_period_end: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -533,6 +537,8 @@ export interface Database {
     };
     Views: Record<string, never>;
     Functions: {
+      admin_console: { Args: { p_action: string; p_payload?: Json }; Returns: Json };
+      billing_summary: { Args: Record<string, never>; Returns: Json };
       accept_organization_invite: {
         Args: { p_invite_id: string };
         Returns: string;

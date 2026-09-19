@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { extractPlaceholders, fillTemplate, filterPrompts, listPromptTemplates, type PromptTemplate } from './prompts';
 
-const api = vi.hoisted(() => ({ from: vi.fn(), select: vi.fn(), gt: vi.fn(), order: vi.fn(), limit: vi.fn() }));
+const api = vi.hoisted(() => ({ from: vi.fn(), select: vi.fn(), eq: vi.fn(), gt: vi.fn(), order: vi.fn(), limit: vi.fn() }));
 vi.mock('@/integrations/supabase/client', () => ({ supabase: { from: api.from } }));
 const prompt = (n: number, category = 'Blue Economy & Aquaculture', template = 'Reveal overlooked value in [SUBJECT] within [LOCATION].') =>
   ({ id: String(n), prompt_number: n, category, template, workflow: ['integrator_agent'], created_at: '' }) as PromptTemplate;
@@ -10,6 +10,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   api.from.mockReturnValue(api);
   api.select.mockReturnValue(api);
+  api.eq.mockReturnValue(api);
   api.gt.mockReturnValue(api);
   api.order.mockReturnValue(api);
 });
@@ -43,4 +44,3 @@ describe('large prompt library', () => {
     expect(fillTemplate(template, { SUBJECT: 'seaweed', LOCATION: 'Lagos' })).toBe('Analyze seaweed in Lagos. Challenge assumptions about seaweed.');
   });
 });
-

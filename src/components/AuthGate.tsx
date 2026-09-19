@@ -18,7 +18,17 @@ export function AuthGate({ children }: { children: ReactNode }) {
       <button onClick={() => void signOut().catch(() => toast.error("Unable to sign out. Please try again."))}>Sign out</button>
     </div>
   );
-  if (!profile.onboarded && pathname !== "/onboarding") return <Navigate to="/onboarding" replace />;
+  if (profile.account_status === "suspended" && pathname !== "/billing") return (
+    <main className="max-w-lg mx-auto p-8 space-y-4" role="alert">
+      <h1 className="text-2xl font-bold">Account suspended</h1>
+      <p>{profile.suspension_reason || "Please contact support about your account."}</p>
+      <p>Suspension does not cancel a subscription. You can still manage or cancel your billing.</p>
+      <a href="/billing" className="underline">Manage billing</a>{" · "}
+      <button onClick={() => void refreshProfile()}>Check access again</button>{" · "}
+      <button onClick={() => void signOut().catch(() => toast.error("Unable to sign out."))}>Sign out</button>
+    </main>
+  );
+  if (!profile.onboarded && pathname !== "/onboarding" && pathname !== "/billing") return <Navigate to="/onboarding" replace />;
   if (pathname === "/admin" && !profile.is_platform_admin) return <p role="alert" className="p-8">You don't have access to this page.</p>;
   return children;
 }
