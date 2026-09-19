@@ -5,8 +5,9 @@ import { AppNav } from "@/components/AppNav";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { WorkflowProgress } from "@/components/WorkflowProgress";
-import { listPromptTemplates, groupByCategory, filterPrompts, fillTemplate, extractPlaceholders, type PromptTemplate } from "@/lib/prompts";
+import { listPromptTemplates, groupByCategory, filterPrompts, extractPlaceholders, type PromptTemplate } from "@/lib/prompts";
 import { listProjects, type Project } from "@/lib/projects";
 import { runIntelligenceWorkflow, type AgentOutput } from "@/lib/ask-absolute";
 import { saveOpportunityFromMessage } from "@/lib/conversations";
@@ -29,9 +30,16 @@ export default function Prompts() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectId, setProjectId] = useState("");
   const [active, setActive] = useState<PromptTemplate | null>(null);
-  const [values, setValues] = useState<Record<string, string>>({});
+  const [draft, setDraft] = useState("");
+  const editorRef = useRef<HTMLTextAreaElement>(null);
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<AgentOutput | null>(null);
+
+  useEffect(() => {
+    if (!active) return;
+    editorRef.current?.focus({ preventScroll: true });
+    editorRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [active]);
 
   useEffect(() => {
     if (!ready) return;
@@ -59,24 +67,36 @@ export default function Prompts() {
 
   const openPrompt = (p: PromptTemplate) => {
     if (running || savingRef.current) return;
+    if (active?.id === p.id) {
+      editorRef.current?.focus();
+      return;
+    }
     setActive(p);
-    setValues({});
+    setDraft(p.template);
     setResult(null);
   };
 
   const run = async () => {
-    if (!active || running) return;
-    if (extractPlaceholders(active.template).some((ph) => !values[ph]?.trim())) {
-      toast.error("Fill in the prompt fields first."); return;
+    if (!active || running || savingRef.current) return;
+    const prompt = draft.trim();
+    if (!prompt) {
+      toast.error("Enter your prompt first."); return;
+    }
+    if (prompt.length > 20000) {
+      toast.error("Keep your prompt under 20,000 characters."); return;
+    }
+    if (extractPlaceholders(prompt).length) {
+      toast.error("Replace the bracketed fields with your details before generating.");
+      editorRef.current?.focus();
+      return;
     }
     setRunning(true);
     setResult(null);
     try {
-      const filled = fillTemplate(active.template, values);
       const r = await runIntelligenceWorkflow({
         mode: "discover",
         agents: active.workflow,
-        prompt: filled,
+        prompt,
         context: projectId ? { projectId } : undefined,
       });
       setResult(r);
@@ -179,20 +199,26 @@ export default function Prompts() {
 
           <div>
             {!active ? (
-              <Card className="p-8 text-center text-sm text-muted-foreground border-dashed">Select a prompt to run it.</Card>
+              <Card className="p-8 text-center text-sm text-muted-foreground border-dashed">Select a prompt, edit it with your details, then generate.</Card>
             ) : (
               <Card className="p-5 space-y-4">
                 <div>
                   <Badge variant="outline">{active.category}</Badge>
-                  <p className="text-sm mt-2">{active.template}</p>
                 </div>
-                {extractPlaceholders(active.template).map((ph) => (
-                  <div key={ph} className="space-y-1">
-                    <label htmlFor={`prompt-${ph}`} className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground">{ph}</label>
-                    <Input id={`prompt-${ph}`} disabled={running || saving !== null} value={values[ph] ?? ""} onChange={(e) => setValues((v) => ({ ...v, [ph]: e.target.value }))} />
+                <div className="space-y-2">
+                  <label htmlFor="editable-prompt" className="text-sm font-semibold">Edit your prompt</label>
+                  <p id="prompt-edit-help" className="text-xs text-muted-foreground">Replace bracketed fields such as [SUBJECT] with your details. You can rewrite any part or add more context before generating.</p>
+                  <Textarea ref={editorRef} id="editable-prompt" aria-describedby="prompt-edit-help"
+                    rows={12} maxLength={20000} value={draft} disabled={running || saving !== null}
+                    className="min-h-64 resize-y text-sm leading-relaxed"
+                    onChange={(e) => { setDraft(e.target.value); setResult(null); }} />
+                  <div className="flex items-center justify-between gap-2">
+                    <Button variant="ghost" size="sm" disabled={running || saving !== null || draft === active.template}
+                      onClick={() => { setDraft(active.template); setResult(null); editorRef.current?.focus(); }}>Reset to original</Button>
+                    <span className="text-xs text-muted-foreground">{draft.length.toLocaleString("en-US")} / 20,000</span>
                   </div>
-                ))}
-                <Button onClick={run} disabled={running || saving !== null} variant="accent">{running ? "Generating…" : "Generate with swarm intelligence"}</Button>
+                </div>
+                <Button onClick={run} disabled={running || saving !== null || !draft.trim()} variant="accent">{running ? "Generating…" : "Generate with swarm intelligence"}</Button>
                 <WorkflowProgress active={running} swarm />
 
                 {result && (
