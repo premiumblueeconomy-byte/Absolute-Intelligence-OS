@@ -6,7 +6,8 @@ export const reportTitle = (c: ReportContent) => c.opportunityPortfolio[0]?.titl
 export const reportDate = (c: ReportContent) => new Date(c.generatedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 export const safeScore = (value: number) => Math.max(0, Math.min(100, Number.isFinite(value) ? value : 0));
 
-export function reportSections(c: ReportContent): { title: string; items: string[] }[] {
+export function reportSections(c: ReportContent): import('./section-document').ReportBlock[] {
+  if (c.sections) return c.sections;
   return [
     { title: 'Executive summary', items: [c.executiveSummary] },
     { title: 'Project objective', items: [c.currentReality] },

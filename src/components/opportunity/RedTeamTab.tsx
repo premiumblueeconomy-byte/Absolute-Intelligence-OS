@@ -1,48 +1,21 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+
 import { Badge } from "@/components/ui/badge";
-import { WorkflowProgress } from "@/components/WorkflowProgress";
-import { runRedTeam, listRedTeamRuns, groupRisksByPerspective, type RedTeamRun } from "@/lib/red-team";
+
+import { listRedTeamRuns, groupRisksByPerspective, type RedTeamRun } from "@/lib/red-team";
 import { createExperiment } from "@/lib/experiments";
 import type { AgentOutput } from "@/lib/ask-absolute";
 import type { Opportunity } from "@/lib/opportunities";
-import { Swords, Loader2, FlaskConical } from "lucide-react";
+import { FlaskConical } from "lucide-react";
 
 export function RedTeamTab({ opportunity }: { opportunity: Opportunity }) {
   const [runs, setRuns] = useState<RedTeamRun[]>([]);
-  const [running, setRunning] = useState(false);
-
-  useEffect(() => { void listRedTeamRuns(opportunity.id).then(setRuns); }, [opportunity.id]);
-
-  const attack = async () => {
-    setRunning(true);
-    try {
-      const { run } = await runRedTeam(opportunity);
-      setRuns((r) => [run, ...r]);
-      toast.success("Red team run complete");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not run the red team");
-    } finally {
-      setRunning(false);
-    }
-  };
-
+  useEffect(() => { void listRedTeamRuns(opportunity.id).then(setRuns).catch(()=>toast.error("Could not load saved critiques")); }, [opportunity.id]);
   return (
     <div className="space-y-4">
-      <Button onClick={attack} disabled={running} variant="destructive">
-        {running ? <Loader2 className="w-4 h-4 animate-spin" /> : <Swords className="w-4 h-4" />} Attack This Idea
-      </Button>
-      <WorkflowProgress active={running} />
-
-      {runs.length === 0 && !running && (
-        <p className="text-sm text-muted-foreground">
-          No critique run yet. "Attack This Idea" argues against this opportunity from ten adversarial
-          perspectives — the point is to find what could make it fail before you spend real money.
-        </p>
-      )}
-
+      <p className="text-sm text-muted-foreground">Generate a draft above to challenge this opportunity. Earlier critiques remain below.</p>
       {runs.map((run) => (
         <RedTeamResultCard key={run.id} run={run} opportunityId={opportunity.id} />
       ))}
@@ -112,3 +85,4 @@ function RedTeamResultCard({ run, opportunityId }: { run: RedTeamRun; opportunit
     </Card>
   );
 }
+

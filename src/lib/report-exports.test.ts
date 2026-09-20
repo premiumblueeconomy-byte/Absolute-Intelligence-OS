@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import JSZip from 'jszip';
 import { buildReportPdf } from './report-pdf';
-import { buildReportPptx } from './report-pptx';
+import { buildReportPptxBytes } from './report-pptx';
 import { splitReportText } from './report-design';
 import type { ReportContent } from './reports';
 
@@ -29,8 +29,10 @@ describe('downloadable reports', () => {
     expect(pdf.output().startsWith('%PDF-')).toBe(true);
   });
   it('writes a valid editable PPTX with separate confidence and opportunity scores', async () => {
-    const result = await buildReportPptx(report).write({ outputType: 'nodebuffer' });
-    const zip = await JSZip.loadAsync(result as Buffer);
+    const result = await buildReportPptxBytes(report);
+    const zip = await JSZip.loadAsync(result);
+    const manifest=await zip.file('[Content_Types].xml')!.async('string');
+    for(const match of manifest.matchAll(/PartName="([^"]+)"/g)) expect(zip.file(match[1].replace(/^\//,''))).not.toBeNull();
     expect(zip.file('[Content_Types].xml')).not.toBeNull();
     const files = Object.keys(zip.files).filter((p) => /^ppt\/slides\/slide\d+\.xml$/.test(p));
     const xml = (await Promise.all(files.map((p) => zip.file(p)!.async('string')))).join('');
@@ -40,6 +42,14 @@ describe('downloadable reports', () => {
     expect(xml).toContain('28');
     expect(xml).toContain('Reassess the opportunity.');
     expect(xml).toContain('<a:t>');
+  });
+  it('retains long section table contents through PDF and editable PowerPoint pagination',async()=>{
+    const expanded={...report,sections:[{title:'Execution — DRAFT',items:['Draft generated 20 September 2026.'],table:{headers:['Task','Method','KPI'],rows:[['Pilot','Long method with sampling and measurement. '.repeat(80)+'FINAL_TABLE_MARKER','Success criteria']]}}]};
+    const pdf=buildReportPdf(expanded);expect(pdf.output()).toContain('FINAL_TABLE_MARKER');
+    const zip=await JSZip.loadAsync(await buildReportPptxBytes(expanded));
+    const slides=Object.keys(zip.files).filter(p=>/^ppt\/slides\/slide\d+\.xml$/.test(p));
+    const xml=(await Promise.all(slides.map(p=>zip.file(p)!.async('string')))).join('');
+    expect(xml).toContain('FINAL_TABLE_MARKER');expect(xml).toContain('<a:tbl>');expect(xml).toContain('DRAFT');
   });
 });
 

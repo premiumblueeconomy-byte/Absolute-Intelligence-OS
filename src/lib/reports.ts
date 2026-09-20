@@ -10,6 +10,8 @@ export type Report = Database["public"]["Tables"]["reports"]["Row"];
 
 /** The Absolute Intelligence Report format — spec section 44, trimmed to what Phase 1 can populate. */
 export interface ReportContent {
+  sections?: import('./section-document').ReportBlock[];
+  hideScorecard?: boolean;
   title: string;
   generatedAt: string;
   executiveSummary: string;
