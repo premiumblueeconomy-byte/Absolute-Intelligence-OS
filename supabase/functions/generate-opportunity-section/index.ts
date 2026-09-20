@@ -33,7 +33,7 @@ Deno.serve(async(req:Request)=>{
    const res=await fetch('https://api.deepseek.com/chat/completions',{method:'POST',signal:AbortSignal.any([deadline,AbortSignal.timeout(role==='integrator'?65000:35000)]),headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify({model:Deno.env.get('AIOS_MODEL')||'deepseek-chat',max_tokens:maxTokens,response_format:{type:'json_object'},messages:[{role:'system',content:system},{role:'user',content}]})});
    if(!res.ok)throw new Error(res.status===402?'AI provider balance is insufficient. Please top up the DeepSeek account.':'AI provider is busy or unavailable. Retry this section.');
    const data=await res.json();const choice=data?.choices?.[0];
-   if(choice?.finish_reason==='length')throw new Error('The section was too long. Request a shorter analysis and retry.');
+   if(choice?.finish_reason==='length')throw new SyntaxError('Model JSON was truncated.');
    return JSON.parse(String(choice?.message?.content||'').replace(/^```(?:json)?\s*/,'').replace(/\s*```$/,''));
   });
   const run=await rpc('finish_opportunity_section',{p_id:runId,p_result:output.result,p_calculations:{...output.calculations,model:Deno.env.get('AIOS_MODEL')||'deepseek-chat'}},true);

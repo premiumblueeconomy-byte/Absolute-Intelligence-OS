@@ -25,5 +25,46 @@ describe('section generation contracts',()=>{
   const runs=[{section:'overview',batch_id:'batch',status:'completed'},{section:'scoring',batch_id:'batch',status:'failed'},{section:'scoring',batch_id:'other',status:'completed'}] as SectionRun[];
   expect(pendingSections(runs,'batch',SECTION_ORDER)).toEqual(SECTION_ORDER.slice(1));
  });
+ it('repairs a malformed section once with field-specific feedback',async()=>{
+  let attempts=0;
+  const generated=await generateSection('evidence',context,'',async(role,system,input)=>{
+   if(role==='critic')return {disagreements:[],rejected_ideas:[],required_corrections:[],validation_priorities:[]};
+   if(role!=='integrator')return {summary:'Brief',findings:[],candidates:[],risks:[],evidence_gaps:[]};
+   attempts++;
+   if(attempts===1)return {...fixtures.evidence,assumptions:[{...fixtures.evidence.assumptions[0],evidenceNeeded:['Lab measurements']}]};
+   expect(JSON.parse(input).validationErrors[0].path).toBe('assumptions.0.evidenceNeeded');
+   expect(system).toContain('string fields contain text');
+   return fixtures.evidence;
+  });
+  expect(attempts).toBe(2);
+  expect(generated.result).toEqual(fixtures.evidence);
+ });
+ it('rejects a second invalid response without looping or accepting fabricated fields',async()=>{
+  let attempts=0;
+  await expect(generateSection('experiments',context,'',async(role)=>{
+   if(role==='critic')return {disagreements:[],rejected_ideas:[],required_corrections:[],validation_priorities:[]};
+   if(role!=='integrator')return {summary:'Brief',findings:[],candidates:[],risks:[],evidence_gaps:[]};
+   attempts++;
+   return {...fixtures.experiments,experiments:[{...fixtures.experiments.experiments[0],actual_result:'Fabricated result'}]};
+  })).rejects.toThrow();
+  expect(attempts).toBe(2);
+ });
+ it('repairs invalid JSON but does not retry provider failures',async()=>{
+  let integratorCalls=0;
+  const call=async(role:string)=>{
+   if(role==='critic')return {disagreements:[],rejected_ideas:[],required_corrections:[],validation_priorities:[]};
+   if(role!=='integrator')return {summary:'Brief',findings:[],candidates:[],risks:[],evidence_gaps:[]};
+   if(++integratorCalls===1)throw new SyntaxError('Invalid JSON');
+   return fixtures.overview;
+  };
+  expect((await generateSection('overview',context,'',call)).result).toEqual(fixtures.overview);
+  let providerCalls=0;
+  await expect(generateSection('overview',context,'',async(role)=>{
+   if(role==='critic')return {disagreements:[],rejected_ideas:[],required_corrections:[],validation_priorities:[]};
+   if(role!=='integrator')return {summary:'Brief',findings:[],candidates:[],risks:[],evidence_gaps:[]};
+   providerCalls++;throw new Error('Provider unavailable');
+  })).rejects.toThrow('Provider unavailable');
+  expect(providerCalls).toBe(1);
+ });
 });
 
