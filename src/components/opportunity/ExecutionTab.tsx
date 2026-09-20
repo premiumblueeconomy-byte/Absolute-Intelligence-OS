@@ -5,11 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
-  listTasks, createTask, updateTaskStatus, deleteTask, seedDefaultRoadmap,
+  listTasks, createTask, updateTaskStatus, deleteTask,
   PHASE_LABEL, PHASE_ORDER, STATUS_ORDER, type Task, type TaskPhase, type TaskStatus,
 } from "@/lib/execution";
 import type { Opportunity } from "@/lib/opportunities";
-import { Plus, Trash2, Rocket } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 
 const STATUS_LABEL: Record<TaskStatus, string> = { todo: "To do", in_progress: "In progress", blocked: "Blocked", done: "Done" };
 
@@ -18,24 +18,8 @@ export function ExecutionTab({ opportunity }: { opportunity: Opportunity }) {
   const [title, setTitle] = useState("");
   const [phase, setPhase] = useState<TaskPhase>("validation");
   const [owner, setOwner] = useState("");
-  const [seeding, setSeeding] = useState(false);
-
-  const load = () => { void listTasks(opportunity.id).then(setTasks); };
+  const load = () => { void listTasks(opportunity.id).then(setTasks).catch(()=>toast.error("Could not load tasks")); };
   useEffect(load, [opportunity.id]);
-
-  const seed = async () => {
-    setSeeding(true);
-    try {
-      await seedDefaultRoadmap(opportunity.id, opportunity.recommended_next_action);
-      load();
-      toast.success("12-month roadmap created");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not seed the roadmap");
-    } finally {
-      setSeeding(false);
-    }
-  };
-
   const add = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
@@ -55,17 +39,6 @@ export function ExecutionTab({ opportunity }: { opportunity: Opportunity }) {
     await deleteTask(id);
     load();
   };
-
-  if (tasks.length === 0) {
-    return (
-      <div className="text-center py-8">
-        <p className="text-sm text-muted-foreground mb-3">Intelligence becomes valuable when it reaches action.</p>
-        <Button onClick={seed} disabled={seeding} variant="accent">
-          <Rocket className="w-4 h-4" /> {seeding ? "Building…" : "Build 12-month execution plan"}
-        </Button>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
@@ -114,3 +87,4 @@ export function ExecutionTab({ opportunity }: { opportunity: Opportunity }) {
     </div>
   );
 }
+

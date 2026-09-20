@@ -6,7 +6,7 @@ export function buildReportPdf(content: ReportContent): jsPDF {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   doc.setProperties({ title: content.title, author: 'Absolute Intelligence OS', subject: 'Opportunity analysis' });
   const color = (hex: string) => `#${hex}`;
-  const clean = (text: string) => text.replace(/[–—]/g, '-').replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/\u2026/g, '...');
+  const clean = (text: string) => text.replace(/[–—]/g, '-').replace(/→/g,' to ').replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/\u2026/g, '...');
   const text = (value: string, x: number, y: number, size = 11, fill = C.ink, bold = false) => {
     doc.setFont('helvetica', bold ? 'bold' : 'normal'); doc.setFontSize(size); doc.setTextColor(color(fill));
     doc.text(clean(value), x, y);
@@ -45,8 +45,10 @@ export function buildReportPdf(content: ReportContent): jsPDF {
     if (y === 0 || y > 238) newPage();
     sectionNumber++;
     text(String(sectionNumber).padStart(2, '0'), 18, y, 12, C.teal, true);
-    text(label, 30, y, 17, C.navy, true);
-    doc.setDrawColor(color(C.amber)); doc.setLineWidth(1); doc.line(18, y + 5, 52, y + 5); y += 16;
+    doc.setFont('helvetica','bold');doc.setFontSize(15);
+    const lines=doc.splitTextToSize(clean(label),160) as string[];
+    for(const line of lines){if(y>260)newPage();text(line,30,y,15,C.navy,true);y+=6;}
+    doc.setDrawColor(color(C.amber)); doc.setLineWidth(1); doc.line(18, y + 2, 52, y + 2); y += 10;
   };
   const paragraph = (value: string) => {
     doc.setFont('helvetica', 'normal'); doc.setFontSize(10.5);
@@ -58,6 +60,7 @@ export function buildReportPdf(content: ReportContent): jsPDF {
     }
     y += 5;
   };
+  if (!content.hideScorecard) {
   newPage();
   heading('Opportunity scorecard');
   paragraph(content.confidenceSummary);
@@ -70,9 +73,47 @@ export function buildReportPdf(content: ReportContent): jsPDF {
     if (score.value > 0) doc.roundedRect(20, y + 3, 170 * safeScore(score.value) / 100, 3.5, 1, 1, 'F');
     y += 16;
   }
+  }
+  const table = (headers: string[], rows: string[][]) => {
+    const width=170/headers.length;
+    const header=()=>{
+      if(y>246)newPage();
+      doc.setFillColor(color(C.navy));doc.rect(20,y-4,170,12,'F');
+      headers.forEach((h,i)=>{doc.setFontSize(8);const lines=doc.splitTextToSize(clean(h),width-4);doc.setTextColor('#FFFFFF');doc.text(lines,22+i*width,y);});y+=14;
+    };
+    if(rows.length){
+      doc.setFont('helvetica','normal');doc.setFontSize(9);
+      const firstLines=Math.min(22,Math.max(...rows[0].map(v=>doc.splitTextToSize(clean(v||'Not recorded'),width-5).length)));
+      if(y+20+firstLines*4.2>273)newPage();
+    }
+    header();
+    for(const row of rows){
+      doc.setFont('helvetica','normal');doc.setFontSize(9);
+      const cells=row.map(v=>doc.splitTextToSize(clean(v||'Not recorded'),width-5) as string[]);
+      const length=Math.max(...cells.map(c=>c.length));
+      for(let start=0;start<length;start+=22){
+        const parts=cells.map(c=>c.slice(start,start+22));
+        const height=Math.max(...parts.map(c=>c.length))*4.2+6;
+        if(y+height>273){newPage();header();}
+        parts.forEach((lines,i)=>{doc.setFillColor(color(C.paper));doc.setDrawColor('#DFE5EF');doc.rect(20+i*width,y-3,width,height,'FD');doc.setFontSize(9);doc.setTextColor(color(C.ink));if(lines.length)doc.text(lines,22+i*width,y+1);});y+=height;
+      }
+    }
+    y+=8;
+  };
   for (const section of reportSections(content)) {
     heading(section.title);
-    for (const item of section.items.length ? section.items : ['None recorded.']) paragraph(item);
+    for (const item of section.items.length ? section.items : section.table||section.chart?[]:['None recorded.']) paragraph(item);
+    if(section.chart)for(const metric of section.chart){
+      if(y>251)newPage();
+      paragraph(`${metric.label}: ${metric.value}/100`);
+      doc.setFillColor(color(C.teal));doc.rect(20,y-4,170*safeScore(metric.value)/100,3,'F');y+=5;
+    }
+    if(section.timeline){
+      if(y>220)newPage();
+      const phases=['validation','prototype','pilot','commercial_validation','scale'];
+      phases.forEach((phase,i)=>{text(`${i+1}. ${phase.replace(/_/g,' ')}`,20,y,10,C.navy,true);doc.setFillColor(color([C.teal,C.violet,C.amber][i%3]));doc.rect(102+i*15,y-3,16,3,'F');y+=8;});y+=5;
+    }
+    if(section.table)table(section.table.headers,section.table.rows);
   }
   const count = doc.getNumberOfPages();
   for (let page = 2; page <= count; page++) {

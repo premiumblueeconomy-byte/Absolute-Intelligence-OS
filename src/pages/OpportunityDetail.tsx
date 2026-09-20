@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { AppNav } from "@/components/AppNav";
@@ -9,13 +9,14 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ScoreRadar } from "@/components/ScoreRadar";
 import {
-  getOpportunity, opportunityDims, listAssumptions, listUnknowns, listClaims, listEvidence,
+  getOpportunity, getOpportunityWeights, opportunityDims, listAssumptions, listUnknowns, listClaims, listEvidence,
   updateOpportunityWeights, updateOpportunityStatus,
   type Opportunity, type Assumption, type Unknown_, type Claim, type Evidence,
 } from "@/lib/opportunities";
 import { getProject, type Project } from "@/lib/projects";
 import { DEFAULT_WEIGHTS, DIMENSION_LABEL, readinessLabel, type ScoreDimensions } from "@/lib/scoring";
-import { assembleOpportunityReport, saveReport } from "@/lib/reports";
+import { SectionWorkspace } from "@/components/opportunity/SectionWorkspace";
+import type { Section } from "@/lib/opportunity-sections";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { unlockFurther } from "@/lib/unlock-further";
 import { WorkflowProgress } from "@/components/WorkflowProgress";
@@ -23,7 +24,7 @@ import { RedTeamTab } from "@/components/opportunity/RedTeamTab";
 import { ExecutionTab } from "@/components/opportunity/ExecutionTab";
 import { ScenariosTab } from "@/components/opportunity/ScenariosTab";
 import { ExperimentsTab } from "@/components/opportunity/ExperimentsTab";
-import { FileDown, Presentation, Loader2, Sparkles } from "lucide-react";
+import { Loader2, Sparkles } from "lucide-react";
 
 const STATUS_OPTIONS: Opportunity["status"][] = [
   "signal", "discovered", "hypothesis", "investigating", "validating",
@@ -49,17 +50,16 @@ export default function OpportunityDetail() {
   const [claims, setClaims] = useState<Claim[]>([]);
   const [evidence, setEvidence] = useState<Evidence[]>([]);
   const [weights, setWeights] = useState<Record<keyof ScoreDimensions, number>>(DEFAULT_WEIGHTS);
-  const [exporting, setExporting] = useState<'pdf' | 'pptx' | null>(null);
-  const exportLock = useRef(false);
-
+  const [section, setSection] = useState<Section>('overview');
+  const [revision, setRevision] = useState(0);
   const load = async () => {
     const o = await getOpportunity(opportunityId);
     setOpportunity(o);
     if (o) {
-      const [p, a, u, c, e] = await Promise.all([
-        getProject(o.project_id), listAssumptions(o.id), listUnknowns(o.id), listClaims(o.id), listEvidence(o.id),
+      const [p, a, u, c, e, w] = await Promise.all([
+        getProject(o.project_id), listAssumptions(o.id), listUnknowns(o.id), listClaims(o.id), listEvidence(o.id), getOpportunityWeights(o.id),
       ]);
-      setProject(p); setAssumptions(a); setUnknowns(u); setClaims(c); setEvidence(e);
+      setWeights(w); setProject(p); setAssumptions(a); setUnknowns(u); setClaims(c); setEvidence(e);
     }
   };
   useEffect(() => { if (ready) void load(); }, [opportunityId, ready]);
@@ -97,34 +97,6 @@ export default function OpportunityDetail() {
       toast.error(err instanceof Error ? err.message : "Could not unlock further");
     } finally {
       setUnlocking(false);
-    }
-  };
-
-  const generateReport = async (format: 'pdf' | 'pptx') => {
-    if (!opportunity || !project || exportLock.current) return;
-    exportLock.current = true;
-    setExporting(format);
-    try {
-      const content = await assembleOpportunityReport(project, opportunity);
-      if (format === 'pdf') {
-        const { exportReportPdf } = await import('@/lib/report-pdf');
-        exportReportPdf(content);
-      } else {
-        const { exportReportPptx } = await import('@/lib/report-pptx');
-        await exportReportPptx(content);
-      }
-      toast.success(`${format.toUpperCase()} download started`);
-      // A history-write failure must never prevent a requested download.
-      try {
-        await saveReport({ projectId: project.id, opportunityId: opportunity.id, title: content.title, content });
-      } catch {
-        toast.warning('Download started, but the report could not be added to project history.');
-      }
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not generate report");
-    } finally {
-      exportLock.current = false;
-      setExporting(null);
     }
   };
 
@@ -174,14 +146,7 @@ export default function OpportunityDetail() {
           <Badge>Opportunity {opportunity.opportunity_score}/100</Badge>
           <Badge variant="outline">Confidence {opportunity.confidence_score}/100</Badge>
           <Badge variant="outline">{readiness.label}</Badge>
-          <div className="flex flex-wrap gap-2 ml-auto">
-            <Button size="sm" variant="outline" onClick={() => void generateReport('pdf')} disabled={exporting !== null || !project}>
-              {exporting === 'pdf' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileDown className="w-3.5 h-3.5" />} {exporting === 'pdf' ? 'Preparing PDF…' : 'Download PDF'}
-            </Button>
-            <Button size="sm" variant="accent" onClick={() => void generateReport('pptx')} disabled={exporting !== null || !project}>
-              {exporting === 'pptx' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Presentation className="w-3.5 h-3.5" />} {exporting === 'pptx' ? 'Preparing PowerPoint…' : 'Download PowerPoint'}
-            </Button>
-          </div>
+
         </div>
 
         {opportunity.confidence_score < 50 && (
@@ -193,8 +158,8 @@ export default function OpportunityDetail() {
           </Card>
         )}
 
-        <Tabs defaultValue="overview">
-          <TabsList>
+        <Tabs value={section} onValueChange={v=>setSection(v as Section)}>
+          <TabsList className="h-auto flex flex-wrap justify-start">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="scoring">Scoring</TabsTrigger>
             <TabsTrigger value="evidence">Assumptions & Unknowns</TabsTrigger>
@@ -203,6 +168,7 @@ export default function OpportunityDetail() {
             <TabsTrigger value="scenarios">Scenarios</TabsTrigger>
             <TabsTrigger value="execution">Execution</TabsTrigger>
           </TabsList>
+          {project && <SectionWorkspace key={opportunity.id} opportunity={opportunity} project={project} section={section} onSectionChange={setSection} onApplied={async()=>{await load();setRevision(v=>v+1);}}/>}
 
           <TabsContent value="overview">
             <div className="grid md:grid-cols-2 gap-4">
@@ -340,19 +306,19 @@ export default function OpportunityDetail() {
           </TabsContent>
 
           <TabsContent value="redteam">
-            <RedTeamTab opportunity={opportunity} />
+            <RedTeamTab key={revision} opportunity={opportunity} />
           </TabsContent>
 
           <TabsContent value="experiments">
-            <ExperimentsTab opportunity={opportunity} />
+            <ExperimentsTab key={revision} opportunity={opportunity} />
           </TabsContent>
 
           <TabsContent value="scenarios">
-            <ScenariosTab opportunity={opportunity} />
+            <ScenariosTab key={revision} opportunity={opportunity} />
           </TabsContent>
 
           <TabsContent value="execution">
-            <ExecutionTab opportunity={opportunity} />
+            <ExecutionTab key={revision} opportunity={opportunity} />
           </TabsContent>
         </Tabs>
       </main>
@@ -387,4 +353,7 @@ function TagList({ label, items }: { label: string; items: string[] }) {
 function Empty({ text }: { text: string }) {
   return <p className="text-sm text-muted-foreground">{text}</p>;
 }
+
+
+
 

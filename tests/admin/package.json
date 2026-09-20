@@ -1,1 +1,11 @@
-{"name":"admin-database-verification","private":true,"type":"module","scripts":{"test":"node verify.mjs"},"devDependencies":{"@electric-sql/pglite":"0.3.14"}}
+{
+  "name": "admin-database-verification",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node verify.mjs && node sections.mjs"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.3.14"
+  }
+}

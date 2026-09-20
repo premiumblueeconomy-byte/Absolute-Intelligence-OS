@@ -175,6 +175,12 @@ export async function listAssumptions(opportunityId: string): Promise<Assumption
   return data ?? [];
 }
 
+export async function getOpportunityWeights(opportunityId:string):Promise<Record<keyof ScoreDimensions,number>> {
+  const {data,error}=await supabase.from('opportunity_scores').select('weights').eq('opportunity_id',opportunityId).order('created_at',{ascending:false}).limit(1).maybeSingle();
+  if(error)throw error;
+  return {...DEFAULT_WEIGHTS,...(data?.weights as Partial<Record<keyof ScoreDimensions,number>> || {})};
+}
+
 export async function listUnknowns(opportunityId: string): Promise<Unknown_[]> {
   const { data, error } = await supabase.from("unknowns").select("*").eq("opportunity_id", opportunityId).order("created_at");
   if (error) throw error;
